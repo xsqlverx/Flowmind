@@ -1,0 +1,47 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Rounded squircle badge background with glowing border -->
+    <path
+        android:pathData="M34,26 L74,26 A14,14 0 0 1 88,40 L88,68 A14,14 0 0 1 74,82 L34,82 A14,14 0 0 1 20,40 L20,40 A14,14 0 0 1 34,26 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#4CD7F6">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="20"
+                android:startY="26"
+                android:endX="88"
+                android:endY="82"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#2A1B4E" />
+                <item android:offset="1.0" android:color="#141726" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Bell shape -->
+    <path
+        android:fillColor="#D0BCFF"
+        android:pathData="M54,34 C46,34 40,40 40,48 L40,58 L36,62 L36,64 L72,64 L72,62 L68,58 L68,48 C68,40 62,34 54,34 Z" />
+
+    <!-- Bell Clapper -->
+    <path
+        android:fillColor="#4EDEACB0"
+        android:pathData="M51,65 C51,66.6 52.4,68 54,68 C55.6,68 57,66.6 57,65 Z" />
+
+    <!-- Cyan glowing notification pulse dot -->
+    <path
+        android:fillColor="#4CD7F6"
+        android:pathData="M68,36 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+
+    <!-- Inner Checkmark symbol -->
+    <path
+        android:pathData="M48,51 L53,56 L62,45"
+        android:strokeWidth="2.5"
+        android:strokeColor="#1E1035"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

@@ -1,0 +1,6 @@
+{
+  "name": "FlowMind",
+  "description": "Liquid glassmorphic AI reminder companion with natural language parsing and SQLite Room persistence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
