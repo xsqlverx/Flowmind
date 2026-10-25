@@ -39,6 +39,41 @@ class ExampleRobolectricTest {
   }
 
   @Test
+  fun `test nlp parser handles both dot and colon time formats and fullstops`() {
+    // 1. Dot format with PM: 7.00pm
+    val resultDotPm = NlpReminderParser.parse("remind me at 7.00pm")
+    assertTrue(resultDotPm.dueTimeString.contains("7:00 PM"))
+    assertEquals(false, resultDotPm.needsLlmAssistance)
+    assertEquals("Keyword Classifier (Local)", resultDotPm.parsingEngine)
+
+    // 2. Colon format with PM: 7:00pm
+    val resultColonPm = NlpReminderParser.parse("remind me at 7:00pm")
+    assertTrue(resultColonPm.dueTimeString.contains("7:00 PM"))
+    assertEquals(false, resultColonPm.needsLlmAssistance)
+
+    // 3. Dot format without AM/PM: 7.00
+    val resultDotBare = NlpReminderParser.parse("remind me at 7.00")
+    assertTrue(resultDotBare.dueTimeString.contains("7:00"))
+    assertEquals(false, resultDotBare.needsLlmAssistance)
+
+    // 4. Colon format without AM/PM: 7:00
+    val resultColonBare = NlpReminderParser.parse("remind me at 7:00")
+    assertTrue(resultColonBare.dueTimeString.contains("7:00"))
+    assertEquals(false, resultColonBare.needsLlmAssistance)
+
+    // 5. Ending with a fullstop: 7.00pm.
+    val resultWithFullstop = NlpReminderParser.parse("remind me at 7.00pm.")
+    assertTrue(resultWithFullstop.dueTimeString.contains("7:00 PM"))
+    assertEquals(false, resultWithFullstop.needsLlmAssistance)
+    assertTrue(!resultWithFullstop.cleanTitle.endsWith("."))
+
+    // 6. Conversational "i need to be reminded at 7.00pm"
+    val resultConversational = NlpReminderParser.parse("i need to be reminded at 7.00pm")
+    assertTrue(resultConversational.dueTimeString.contains("7:00 PM"))
+    assertEquals(false, resultConversational.needsLlmAssistance)
+  }
+
+  @Test
   fun `test notification channel initialization and scheduler`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     NotificationHelper.initNotificationChannels(context)

@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.ReminderItem
+import com.example.ui.components.SwipeToDismissReminderBox
 import com.example.ui.theme.Error
 import com.example.ui.theme.OnPrimary
 import com.example.ui.theme.OnSurface
@@ -66,6 +68,7 @@ fun CompletedScreen(
     viewModel: ReminderViewModel
 ) {
     val completedReminders by viewModel.completedReminders.collectAsState()
+    val archivedReminders by viewModel.archivedReminders.collectAsState()
     val selectedTab by viewModel.selectedCompletedTab.collectAsState()
 
     // Group items for display
@@ -80,7 +83,7 @@ fun CompletedScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Surface)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -387,52 +390,15 @@ fun CompletedScreen(
             }
         }
 
-        // Group 1: Earlier Today
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "EARLIER TODAY",
-                    color = OnSurfaceVariant,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.6.sp,
-                    maxLines = 1,
-                    softWrap = false
-                )
-                Text(
-                    text = "${todayReminders.size} items",
-                    color = Outline,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            }
-        }
-
-        items(todayReminders, key = { it.id }) { reminder ->
-            CompletedItemCard(
-                reminder = reminder,
-                onRestore = { viewModel.toggleCompleted(reminder) },
-                onDelete = { viewModel.deleteReminder(reminder) }
-            )
-        }
-
-        // Group 2: Yesterday
-        if (yesterdayReminders.isNotEmpty()) {
+        if (selectedTab == "Archived") {
             item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "YESTERDAY",
+                        text = "ARCHIVED REMINDERS",
                         color = OnSurfaceVariant,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -441,7 +407,7 @@ fun CompletedScreen(
                         softWrap = false
                     )
                     Text(
-                        text = "${yesterdayReminders.size} items",
+                        text = "${archivedReminders.size} items",
                         color = Outline,
                         fontSize = 11.sp,
                         maxLines = 1,
@@ -450,12 +416,129 @@ fun CompletedScreen(
                 }
             }
 
-            items(yesterdayReminders, key = { it.id }) { reminder ->
-                CompletedItemCard(
-                    reminder = reminder,
-                    onRestore = { viewModel.toggleCompleted(reminder) },
-                    onDelete = { viewModel.deleteReminder(reminder) }
-                )
+            if (archivedReminders.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No archived reminders. Swipe right on completed items to archive them.",
+                            color = Outline,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            } else {
+                items(archivedReminders, key = { it.id }) { reminder ->
+                    SwipeToDismissReminderBox(
+                        onDelete = { viewModel.deleteReminder(reminder) },
+                        onStartToEnd = { viewModel.restoreArchivedReminder(reminder) },
+                        startToEndLabel = "Restore",
+                        startToEndIcon = Icons.Default.Restore,
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        CompletedItemCard(
+                            reminder = reminder,
+                            onRestore = { viewModel.restoreArchivedReminder(reminder) },
+                            onDelete = { viewModel.deleteReminder(reminder) },
+                            onArchive = null
+                        )
+                    }
+                }
+            }
+        } else {
+            // Group 1: Earlier Today
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "EARLIER TODAY",
+                        color = OnSurfaceVariant,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                    Text(
+                        text = "${todayReminders.size} items",
+                        color = Outline,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+
+            items(todayReminders, key = { it.id }) { reminder ->
+                SwipeToDismissReminderBox(
+                    onDelete = { viewModel.deleteReminder(reminder) },
+                    onStartToEnd = { viewModel.archiveReminder(reminder) },
+                    startToEndLabel = "Archive",
+                    startToEndIcon = Icons.Default.Archive,
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    CompletedItemCard(
+                        reminder = reminder,
+                        onRestore = { viewModel.toggleCompleted(reminder) },
+                        onDelete = { viewModel.deleteReminder(reminder) },
+                        onArchive = { viewModel.archiveReminder(reminder) }
+                    )
+                }
+            }
+
+            // Group 2: Yesterday
+            if (yesterdayReminders.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "YESTERDAY",
+                            color = OnSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        Text(
+                            text = "${yesterdayReminders.size} items",
+                            color = Outline,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+
+                items(yesterdayReminders, key = { it.id }) { reminder ->
+                    SwipeToDismissReminderBox(
+                        onDelete = { viewModel.deleteReminder(reminder) },
+                        onStartToEnd = { viewModel.archiveReminder(reminder) },
+                        startToEndLabel = "Archive",
+                        startToEndIcon = Icons.Default.Archive,
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        CompletedItemCard(
+                            reminder = reminder,
+                            onRestore = { viewModel.toggleCompleted(reminder) },
+                            onDelete = { viewModel.deleteReminder(reminder) },
+                            onArchive = { viewModel.archiveReminder(reminder) }
+                        )
+                    }
+                }
             }
         }
 
@@ -518,7 +601,8 @@ fun CompletedScreen(
 fun CompletedItemCard(
     reminder: ReminderItem,
     onRestore: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onArchive: (() -> Unit)? = null
 ) {
     Box(
         modifier = Modifier
@@ -631,6 +715,24 @@ fun CompletedItemCard(
                         tint = OnSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
+                }
+
+                if (onArchive != null) {
+                    IconButton(
+                        onClick = onArchive,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x14FFFFFF))
+                            .testTag("archive_completed_btn_${reminder.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Archive,
+                            contentDescription = "Archive reminder",
+                            tint = OnSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
                 IconButton(

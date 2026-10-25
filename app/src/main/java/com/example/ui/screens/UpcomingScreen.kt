@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.ReminderItem
+import com.example.ui.components.SwipeToDismissReminderBox
 import com.example.ui.theme.Error
 import com.example.ui.theme.ErrorContainer
 import com.example.ui.theme.OnPrimary
@@ -136,7 +138,7 @@ fun UpcomingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Surface)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -402,16 +404,30 @@ fun UpcomingScreen(
             }
         }
 
-        // Timeline Reminder Cards List
+        // Timeline Reminder Cards List (with swipe-to-dismiss)
         items(filteredReminders, key = { it.id }) { reminder ->
-            UpcomingTimelineCard(
-                reminder = reminder,
-                onCompleteToggle = { viewModel.toggleCompleted(reminder) },
-                onEditClick = { viewModel.setEditingReminder(reminder) },
-                onRescheduleClick = { viewModel.rescheduleReminder(reminder) },
-                onSnoozeClick = { viewModel.snoozeReminder(reminder) },
-                onDeleteClick = { viewModel.deleteReminder(reminder) }
-            )
+            SwipeToDismissReminderBox(
+                onDelete = { viewModel.deleteReminder(reminder) },
+                onStartToEnd = {
+                    if (reminder.isCompleted) {
+                        viewModel.archiveReminder(reminder)
+                    } else {
+                        viewModel.toggleCompleted(reminder)
+                    }
+                },
+                startToEndLabel = if (reminder.isCompleted) "Archive" else "Complete",
+                startToEndIcon = if (reminder.isCompleted) Icons.Default.Archive else Icons.Default.Check,
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                UpcomingTimelineCard(
+                    reminder = reminder,
+                    onCompleteToggle = { viewModel.toggleCompleted(reminder) },
+                    onEditClick = { viewModel.setEditingReminder(reminder) },
+                    onRescheduleClick = { viewModel.rescheduleReminder(reminder) },
+                    onSnoozeClick = { viewModel.snoozeReminder(reminder) },
+                    onDeleteClick = { viewModel.deleteReminder(reminder) }
+                )
+            }
         }
 
         // Subtle Bottom Ambient Status Badge

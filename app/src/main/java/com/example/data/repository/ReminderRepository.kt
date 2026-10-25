@@ -58,6 +58,23 @@ class ReminderRepository(
         reminderDao.updateReminder(updated)
     }
 
+    suspend fun archiveReminder(reminder: ReminderItem) {
+        val updated = reminder.copy(
+            isArchived = true,
+            isCompleted = true,
+            completedAtMillis = reminder.completedAtMillis ?: System.currentTimeMillis()
+        )
+        reminderDao.updateReminder(updated)
+    }
+
+    suspend fun restoreArchivedReminder(reminder: ReminderItem) {
+        val updated = reminder.copy(
+            isArchived = false,
+            isCompleted = false
+        )
+        reminderDao.updateReminder(updated)
+    }
+
     suspend fun snoozeReminder(reminder: ReminderItem, additionalMillis: Long) {
         val newDue = reminder.dueDateMillis + additionalMillis
         val updated = reminder.copy(

@@ -9,11 +9,20 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -28,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,6 +84,17 @@ fun FlowMindApp(viewModel: ReminderViewModel) {
     val toastMessage by viewModel.toastMessage.collectAsState()
     val editingReminder by viewModel.editingReminder.collectAsState()
 
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.showToast("Microphone ready 🎙️")
+            viewModel.startVoiceListening()
+        } else {
+            viewModel.showToast("Microphone permission needed for voice input")
+        }
+    }
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         val permissionLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission()
@@ -97,6 +118,15 @@ fun FlowMindApp(viewModel: ReminderViewModel) {
         else -> "Home"
     }
 
+    val tabOrder = remember {
+        mapOf(
+            "home" to 0,
+            "upcoming" to 1,
+            "completed" to 2,
+            "settings" to 3
+        )
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Surface,
@@ -114,15 +144,77 @@ fun FlowMindApp(viewModel: ReminderViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Main Content Tabs
-            when (currentTab) {
-                "upcoming" -> UpcomingScreen(viewModel = viewModel)
-                "completed" -> CompletedScreen(viewModel = viewModel)
-                "settings" -> SettingsScreen(viewModel = viewModel)
-                else -> HomeScreen(
-                    viewModel = viewModel,
-                    onNavigateToUpcoming = { viewModel.setTab("upcoming") }
-                )
+            // Advanced Multi-Dimensional Page Transition
+            AnimatedContent(
+                targetState = currentTab,
+                transitionSpec = {
+                    val forward = (tabOrder[targetState] ?: 0) >= (tabOrder[initialState] ?: 0)
+                    val offsetFraction = 0.28f
+                    if (forward) {
+                        (slideInHorizontally(
+                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+                            initialOffsetX = { (it * offsetFraction).toInt() }
+                        ) + fadeIn(
+                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                        ) + scaleIn(
+                            initialScale = 0.93f,
+                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                        )).togetherWith(
+                            slideOutHorizontally(
+                                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                                targetOffsetX = { -(it * offsetFraction).toInt() }
+                            ) + fadeOut(
+                                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+                            ) + scaleOut(
+                                targetScale = 0.93f,
+                                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                            )
+                        )
+                    } else {
+                        (slideInHorizontally(
+                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+                            initialOffsetX = { -(it * offsetFraction).toInt() }
+                        ) + fadeIn(
+                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                        ) + scaleIn(
+                            initialScale = 0.93f,
+                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                        )).togetherWith(
+                            slideOutHorizontally(
+                                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                                targetOffsetX = { (it * offsetFraction).toInt() }
+                            ) + fadeOut(
+                                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+                            ) + scaleOut(
+                                targetScale = 0.93f,
+                                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                            )
+                        )
+                    }.using(SizeTransform(clip = false))
+                },
+                label = "page_shared_axis_transition",
+                modifier = Modifier.fillMaxSize()
+            ) { targetTab ->
+                when (targetTab) {
+                    "upcoming" -> UpcomingScreen(viewModel = viewModel)
+                    "completed" -> CompletedScreen(viewModel = viewModel)
+                    "settings" -> SettingsScreen(viewModel = viewModel)
+                    else -> HomeScreen(
+                        viewModel = viewModel,
+                        onNavigateToUpcoming = { viewModel.setTab("upcoming") },
+                        onVoicePermissionRequest = {
+                            if (ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            } else {
+                                viewModel.toggleVoiceListening()
+                            }
+                        }
+                    )
+                }
             }
 
             // Floating Toast Notification

@@ -14,6 +14,7 @@ import com.example.data.repository.FlowMindSettings
 import com.example.data.repository.ReminderRepository
 import com.example.notification.NotificationHelper
 import com.example.notification.ReminderNotificationScheduler
+import com.example.util.HapticFeedbackHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +27,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import com.example.data.voice.VoiceSpeechRecognizer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,6 +35,8 @@ import java.util.Locale
 class ReminderViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: ReminderRepository
+    private val voiceRecognizer = VoiceSpeechRecognizer(application)
+
     init {
         val db = AppDatabase.getDatabase(application, viewModelScope)
         repository = ReminderRepository(db.reminderDao(), application)
@@ -47,6 +51,9 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val completedReminders: StateFlow<List<ReminderItem>> = repository.completedReminders
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val archivedReminders: StateFlow<List<ReminderItem>> = repository.archivedReminders
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val settings: StateFlow<FlowMindSettings> = repository.settings
@@ -66,8 +73,9 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
     private val _parsedResult = MutableStateFlow(NlpReminderParser.parse(_composerText.value))
     val parsedResult: StateFlow<ParsedReminderResult> = _parsedResult.asStateFlow()
 
-    private val _isVoiceListening = MutableStateFlow(false)
-    val isVoiceListening: StateFlow<Boolean> = _isVoiceListening.asStateFlow()
+    val isVoiceListening: StateFlow<Boolean> = voiceRecognizer.isListening
+    val voiceAudioRms: StateFlow<Float> = voiceRecognizer.audioRms
+    val voiceStatusMessage: StateFlow<String?> = voiceRecognizer.statusMessage
 
     private val _isLlmSynthesizing = MutableStateFlow(false)
     val isLlmSynthesizing: StateFlow<Boolean> = _isLlmSynthesizing.asStateFlow()
@@ -135,18 +143,36 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleVoiceListening() {
-        if (!_isVoiceListening.value) {
-            _isVoiceListening.value = true
-            val previous = _composerText.value
-            _composerText.value = "Listening... Speak now."
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(2000)
-                _isVoiceListening.value = false
-                _composerText.value = previous
-            }
+        if (voiceRecognizer.isListening.value) {
+            stopVoiceListening()
         } else {
-            _isVoiceListening.value = false
+            startVoiceListening()
         }
+    }
+
+    fun startVoiceListening() {
+        voiceRecognizer.startListening(
+            onPartialResult = { partial ->
+                _composerText.value = partial
+                _parsedResult.value = NlpReminderParser.parse(partial)
+            },
+            onFinalResult = { finalSpeech ->
+                updateComposerText(finalSpeech)
+                showToast("Voice captured: \"$finalSpeech\" ✨")
+            },
+            onError = { error ->
+                showToast(error)
+            }
+        )
+    }
+
+    fun stopVoiceListening() {
+        voiceRecognizer.stopListening()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        voiceRecognizer.destroy()
     }
 
     fun applyPromptTemplate(templateText: String) {
@@ -178,6 +204,7 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
                 newReminder.copy(id = newId),
                 leadMin
             )
+            HapticFeedbackHelper.triggerCreationHaptic(getApplication())
             showToast("Reminder Saved & Scheduled ✓")
             // Reset composer to a clean placeholder
             _composerText.value = ""
@@ -232,6 +259,7 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
                 settings.value.notificationLeadMinutes
             )
             _editingReminder.value = null
+            HapticFeedbackHelper.triggerCreationHaptic(getApplication())
             showToast("Reminder updated")
         }
     }
@@ -254,9 +282,11 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.toggleCompleted(reminder)
             if (!reminder.isCompleted) {
+                HapticFeedbackHelper.triggerCompletionHaptic(getApplication())
                 ReminderNotificationScheduler.cancelReminder(getApplication(), reminder.id)
                 showToast("Completed reminder ✨")
             } else {
+                HapticFeedbackHelper.triggerCreationHaptic(getApplication())
                 ReminderNotificationScheduler.scheduleReminder(
                     getApplication(),
                     reminder.copy(isCompleted = false),
@@ -271,7 +301,30 @@ class ReminderViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.deleteReminder(reminder)
             ReminderNotificationScheduler.cancelReminder(getApplication(), reminder.id)
+            HapticFeedbackHelper.triggerDismissHaptic(getApplication())
             showToast("Reminder deleted")
+        }
+    }
+
+    fun archiveReminder(reminder: ReminderItem) {
+        viewModelScope.launch {
+            repository.archiveReminder(reminder)
+            ReminderNotificationScheduler.cancelReminder(getApplication(), reminder.id)
+            HapticFeedbackHelper.triggerDismissHaptic(getApplication())
+            showToast("Reminder archived 📦")
+        }
+    }
+
+    fun restoreArchivedReminder(reminder: ReminderItem) {
+        viewModelScope.launch {
+            repository.restoreArchivedReminder(reminder)
+            ReminderNotificationScheduler.scheduleReminder(
+                getApplication(),
+                reminder.copy(isArchived = false, isCompleted = false),
+                settings.value.notificationLeadMinutes
+            )
+            HapticFeedbackHelper.triggerCreationHaptic(getApplication())
+            showToast("Reminder restored to Active list ✓")
         }
     }
 

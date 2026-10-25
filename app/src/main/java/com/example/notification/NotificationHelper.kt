@@ -115,7 +115,7 @@ object NotificationHelper {
         val priorityBadge = if (reminder.priority == "HIGH") "[Urgent] " else ""
 
         val notificationBuilder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_reminder)
             .setContentTitle("⏰ $priorityBadge${reminder.title}")
             .setContentText(contentText)
             .setSubText(reminder.category)
@@ -130,11 +130,12 @@ object NotificationHelper {
                 if (reminder.priority == "HIGH") NotificationCompat.PRIORITY_MAX
                 else NotificationCompat.PRIORITY_HIGH
             )
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setContentIntent(openAppPendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "✓ Mark Done", donePendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "⏰ Snooze 15m", snoozePendingIntent)
+            .addAction(R.drawable.ic_stat_reminder, "✓ Mark Done", donePendingIntent)
+            .addAction(R.drawable.ic_stat_reminder, "⏰ Snooze 15m", snoozePendingIntent)
 
         if (!soundEnabled) {
             notificationBuilder.setSilent(true)
@@ -162,7 +163,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_URGENT_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_reminder)
             .setContentTitle("⏰ FlowMind Notification Engine")
             .setContentText("✅ Notifications are verified & delivery is active!")
             .setStyle(

@@ -49,6 +49,11 @@ object ReminderNotificationScheduler {
         val intent = Intent(context, ReminderNotificationReceiver::class.java).apply {
             action = ReminderNotificationReceiver.ACTION_TRIGGER_REMINDER
             putExtra(ReminderNotificationReceiver.EXTRA_REMINDER_ID, reminder.id)
+            putExtra(ReminderNotificationReceiver.EXTRA_TITLE, reminder.title)
+            putExtra(ReminderNotificationReceiver.EXTRA_CATEGORY, reminder.category)
+            putExtra(ReminderNotificationReceiver.EXTRA_PRIORITY, reminder.priority)
+            putExtra(ReminderNotificationReceiver.EXTRA_NOTES, reminder.notes)
+            putExtra(ReminderNotificationReceiver.EXTRA_DUE_TIME, reminder.dueTimeString)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -58,44 +63,60 @@ object ReminderNotificationScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val openAppIntent = Intent(context, com.example.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("reminder_id", reminder.id)
+        }
+        val showIntent = PendingIntent.getActivity(
+            context,
+            reminder.id.toInt(),
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
+            // AlarmClockInfo is Android's highest-precision wakeup mechanism, bypassing Doze throttling
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(effectiveTriggerTime, showIntent)
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+        } catch (e: Exception) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (alarmManager.canScheduleExactAlarms()) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            effectiveTriggerTime,
+                            pendingIntent
+                        )
+                    } else {
+                        alarmManager.setAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            effectiveTriggerTime,
+                            pendingIntent
+                        )
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         effectiveTriggerTime,
                         pendingIntent
                     )
                 } else {
-                    alarmManager.setAndAllowWhileIdle(
+                    alarmManager.setExact(
                         AlarmManager.RTC_WAKEUP,
                         effectiveTriggerTime,
                         pendingIntent
                     )
                 }
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    effectiveTriggerTime,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    effectiveTriggerTime,
-                    pendingIntent
-                )
-            }
-        } catch (e: SecurityException) {
-            // Exact alarm permission not granted, fallback to standard alarm
-            try {
-                alarmManager.set(
-                    AlarmManager.RTC_WAKEUP,
-                    effectiveTriggerTime,
-                    pendingIntent
-                )
             } catch (e2: Exception) {
-                // Handle fallback gracefully
+                try {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        effectiveTriggerTime,
+                        pendingIntent
+                    )
+                } catch (e3: Exception) {
+                    // Handled
+                }
             }
         }
     }
