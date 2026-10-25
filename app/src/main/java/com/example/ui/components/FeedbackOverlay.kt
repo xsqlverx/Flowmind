@@ -19,7 +19,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Outline as GraphicsOutline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalAccessibilityManager
@@ -39,15 +39,19 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.PopupPositionProvider
 import com.example.ui.feedback.FeedbackEvent
 import com.example.ui.feedback.FeedbackKind
-import com.example.ui.theme.*
+import com.example.ui.theme.Error
+import com.example.ui.theme.OnSurface
+import com.example.ui.theme.Primary
+import com.example.ui.theme.SurfaceContainerHighest
+import com.example.ui.theme.SurfaceContainerLow
 import kotlinx.coroutines.delay
 
 private class FeedbackReveal(private val progress: Float) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline = with(density) {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): GraphicsOutline = with(density) {
         val diameter = 56.dp.toPx()
         val width = diameter + (size.width - diameter) * progress
         val height = diameter + (size.height - diameter) * progress
-        Outline.Rounded(RoundRect((size.width - width) / 2, (size.height - height) / 2,
+        GraphicsOutline.Rounded(RoundRect((size.width - width) / 2, (size.height - height) / 2,
             (size.width + width) / 2, (size.height + height) / 2, CornerRadius(28.dp.toPx())))
     }
 }

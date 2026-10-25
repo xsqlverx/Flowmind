@@ -8,6 +8,8 @@ Local APK compilation was stopped at the user's request. No subsequent Gradle ta
 - Passed: project import/reference checks and `git diff --check`.
 - These are source checks, not evidence of a successful Android build or working device microphone.
 
+The cloud build of the motion update reported `FeedbackOverlay.kt:50 Unresolved reference 'Rounded'`. The theme's `Outline` color conflicted with the Compose graphics type in the expression. The overlay now aliases that type as `GraphicsOutline` and imports only the colors it uses. The capsule animation and voice-session changes remain intact. This correction still requires a successful cloud compilation; grammar and project-import checks did not catch this Kotlin name-resolution error.
+
 ## Cloud validation
 
 Use the existing cloud build environment to run `:app:testDebugUnitTest` and its normal APK build. This checkout originally omitted the Gradle launcher scripts/JAR; use the cloud environment's Gradle 9.3.1 setup. The project targets Android 36.1 with AGP 9.1.1.
