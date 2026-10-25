@@ -4,6 +4,7 @@ import com.example.data.model.EntityType
 import com.example.data.model.ParsedEntity
 import com.example.data.model.ParsedReminderResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -17,6 +18,15 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object LlmReminderClient {
+
+    fun isLocalEndpoint(provider: String, endpoint: String): Boolean {
+        val address = if (endpoint.isBlank()) resolveDefaultEndpoint(provider, "") else endpoint.trim()
+        val host = runCatching { java.net.URI(address).host?.lowercase(Locale.ROOT) }.getOrNull() ?: return false
+        if (host in listOf("localhost", "::1", "[::1]")) return true
+        val octets = host.split('.').map { it.toIntOrNull() ?: return false }
+        if (octets.size != 4 || octets.any { it !in 0..255 }) return false
+        return octets[0] == 127 || octets[0] == 10 || (octets[0] == 192 && octets[1] == 168) || (octets[0] == 172 && octets[1] in 16..31)
+    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
@@ -75,10 +85,7 @@ object LlmReminderClient {
     ): Result<ParsedReminderResult> = withContext(Dispatchers.IO) {
         try {
             val trimmedKey = apiKey.trim()
-            val isLocal = provider.lowercase(Locale.ROOT).contains("local") ||
-                    provider.lowercase(Locale.ROOT).contains("ollama") ||
-                    customEndpointUrl.contains("localhost") ||
-                    customEndpointUrl.contains("10.0.2.2")
+            val isLocal = isLocalEndpoint(provider, customEndpointUrl)
 
             // Require an API key for cloud providers
             if (trimmedKey.isEmpty() && !isLocal) {
@@ -106,6 +113,7 @@ object LlmReminderClient {
 
             val effectiveModel = resolveDefaultModel(provider, customModelName)
             val effectiveEndpoint = resolveDefaultEndpoint(provider, customEndpointUrl)
+            require(effectiveEndpoint.startsWith("https://")) { "Use an HTTPS endpoint in settings." }
 
             val jsonResponseText: String = when (provider.lowercase(Locale.ROOT)) {
                 "google gemini", "gemini" -> callGemini(input, systemInstruction, effectiveModel, trimmedKey)
@@ -122,15 +130,17 @@ object LlmReminderClient {
 
             val jsonObject = extractJsonObject(jsonResponseText)
 
-            val cleanTitle = jsonObject.optString("cleanTitle", input.take(40))
+            val cleanTitle = jsonObject.optString("cleanTitle", "").trim()
+            require(cleanTitle.isNotBlank()) { "The provider returned an empty reminder title" }
             val category = jsonObject.optString("category", "General")
             val tag = jsonObject.optString("tag", "#general")
-            val priority = jsonObject.optString("priority", "NORMAL").uppercase(Locale.ROOT)
+            val priority = jsonObject.optString("priority", "NORMAL").uppercase(Locale.ROOT).takeIf { it in listOf("HIGH", "NORMAL", "LOW") } ?: "NORMAL"
             val dueTimeString = jsonObject.optString("dueTimeString", "Today · 5:00 PM")
             val dueOffsetMinutes = jsonObject.optLong("dueOffsetMinutes", 120L)
+            require(dueOffsetMinutes in 1..5_256_000) { "The provider returned an invalid reminder time" }
             val participant = jsonObject.optString("participant", "")
-            val recurrence = jsonObject.optString("recurrence", "NONE").uppercase(Locale.ROOT)
-            val notes = jsonObject.optString("notes", "Synthesized with $provider ($effectiveModel)")
+            val recurrence = jsonObject.optString("recurrence", "NONE").uppercase(Locale.ROOT).takeIf { it in listOf("NONE", "DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY") } ?: "NONE"
+            val notes = jsonObject.optString("notes", "")
 
             val dueDateMillis = System.currentTimeMillis() + (dueOffsetMinutes * 60 * 1000L)
 
@@ -167,6 +177,8 @@ object LlmReminderClient {
             )
 
             Result.success(parsedResult)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -421,13 +433,17 @@ object LlmReminderClient {
                 "google gemini", "gemini" -> {
                     "https://generativelanguage.googleapis.com/v1beta/models?key=$trimmedKey"
                 }
-                "anthropic", "claude" -> "https://api.anthropic.com/v1/messages"
+                "anthropic", "claude" -> "https://api.anthropic.com/v1/models"
                 "mistral", "mistral ai" -> "https://api.mistral.ai/v1/models"
                 else -> {
-                    if (customEndpointUrl.isNotBlank()) customEndpointUrl else "https://api.openai.com/v1/models"
+                    if (provider.lowercase(Locale.ROOT) in listOf("custom", "local ollama", "ollama")) {
+                        val endpoint = resolveDefaultEndpoint(provider, customEndpointUrl).trimEnd('/')
+                        if (endpoint.endsWith("/models")) endpoint else endpoint.removeSuffix("/chat/completions") + "/models"
+                    } else "https://api.openai.com/v1/models"
                 }
             }
 
+            require(pingUrl.startsWith("https://")) { "Use an HTTPS endpoint in settings." }
             val requestBuilder = Request.Builder().url(pingUrl)
 
             if (provider.lowercase(Locale.ROOT) != "google gemini" && provider.lowercase(Locale.ROOT) != "gemini") {
@@ -448,11 +464,10 @@ object LlmReminderClient {
 
             client.newCall(requestBuilder.get().build()).execute().use { response ->
                 val elapsed = System.currentTimeMillis() - startTime
-                // If response is returned (HTTP 200, 400, 401, 403, 404, etc.), network round-trip succeeded!
-                if (response.code == 401) {
-                    Result.failure(IllegalStateException("HTTP 401: Invalid or unauthorized API key (${elapsed}ms)"))
-                } else {
+                if (response.isSuccessful) {
                     Result.success(elapsed)
+                } else {
+                    Result.failure(IllegalStateException("HTTP ${response.code}. Check the endpoint and API key."))
                 }
             }
         } catch (e: Exception) {

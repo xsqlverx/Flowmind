@@ -12,9 +12,9 @@ object NlpReminderParser {
 
     /**
      * Parses user natural language input using flexible regex & keyword classification.
-     * Accurately catches 24 out of 25 (96%+) everyday reminders with zero latency and offline capability.
+     * Parses common reminder phrases locally without a network request.
      */
-    fun parse(input: String): ParsedReminderResult {
+    fun parse(input: String, now: Long = System.currentTimeMillis()): ParsedReminderResult {
         val trimmed = input.trim()
         if (trimmed.isEmpty()) {
             return ParsedReminderResult(
@@ -25,7 +25,7 @@ object NlpReminderParser {
                 tag = "",
                 priority = "NORMAL",
                 dueTimeString = "Today",
-                dueDateMillis = System.currentTimeMillis(),
+                dueDateMillis = now,
                 participant = "",
                 recurrence = "NONE",
                 parsingEngine = "Keyword Classifier (Local)",
@@ -221,7 +221,7 @@ object NlpReminderParser {
         }
 
         // 6. Comprehensive Date & Time Detection
-        val calendar = Calendar.getInstance()
+        val calendar = Calendar.getInstance().apply { timeInMillis = now; set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
         var dateSpecified = false
         var timeSpecified = false
         var dueTimeString = "Today"
@@ -393,7 +393,7 @@ object NlpReminderParser {
                 }
                 nextWeekRegex.containsMatchIn(working) -> {
                     val currentDay = calendar.get(Calendar.DAY_OF_WEEK)
-                    val daysUntilNextMonday = (Calendar.MONDAY - currentDay + 7) % 7 + 7
+                    val daysUntilNextMonday = ((Calendar.MONDAY - currentDay + 7) % 7).let { if (it == 0) 7 else it }
                     calendar.add(Calendar.DAY_OF_YEAR, daysUntilNextMonday)
                     calendar.set(Calendar.HOUR_OF_DAY, 9)
                     calendar.set(Calendar.MINUTE, 0)
@@ -442,7 +442,7 @@ object NlpReminderParser {
                             calendar.set(Calendar.HOUR_OF_DAY, 9)
                             calendar.set(Calendar.MINUTE, 0)
                             // If date has passed in current year, schedule for next year
-                            if (calendar.timeInMillis < System.currentTimeMillis() - 86400000L) {
+                            if (calendar.timeInMillis < now - 86400000L) {
                                 calendar.add(Calendar.YEAR, 1)
                             }
                             val dateStr = SimpleDateFormat("MMM d", Locale.getDefault()).format(calendar.time)
@@ -502,7 +502,7 @@ object NlpReminderParser {
             val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
             dueTimeString = if (dateSpecified) "$dueTimeString · $formattedTime" else "Today · $formattedTime"
             working = working.replace(oclockMatch.value, "").trim()
-        } else if (bareAtMatch != null && !dateSpecified) {
+        } else if (bareAtMatch != null) {
             var hr = bareAtMatch.groupValues[1].toInt()
             if (hr in 1..6) hr += 12
             if (hr in 1..24) {
@@ -511,7 +511,7 @@ object NlpReminderParser {
                 calendar.set(Calendar.SECOND, 0)
                 timeSpecified = true
                 val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
-                dueTimeString = "Today · $formattedTime"
+                dueTimeString = if (dateSpecified) "$dueTimeString · $formattedTime" else "Today · $formattedTime"
                 working = working.replace(bareAtMatch.value, "").trim()
             }
         }
@@ -533,6 +533,12 @@ object NlpReminderParser {
                 calendar.set(Calendar.MINUTE, 0)
                 dueTimeString = "Today · 5:00 PM"
             }
+        }
+
+        // A time without a date means the next occurrence of that time.
+        if (!dateSpecified && timeSpecified && calendar.timeInMillis <= now) {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+            dueTimeString = "Tomorrow · ${SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)}"
         }
 
         // Add Date/Time chip to entities list
@@ -603,7 +609,7 @@ object NlpReminderParser {
             recurrence = detectedRecurrence,
             parsingEngine = engineName,
             needsLlmAssistance = needsLlm,
-            notes = if (needsLlm) "Flagged for Neural LLM synthesis" else "Parsed locally via High-Speed Keyword Engine"
+            notes = ""
         )
     }
 

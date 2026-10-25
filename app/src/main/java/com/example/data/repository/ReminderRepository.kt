@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.example.data.time.ReminderTime
+import java.util.Locale
 
 data class FlowMindSettings(
     val llmProvider: String = "Groq",
@@ -34,6 +36,18 @@ class ReminderRepository(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("flowmind_settings_prefs", Context.MODE_PRIVATE)
 
+    init {
+        // Keep the existing configuration, then isolate credentials when changing providers.
+        val provider = prefs.getString("llm_provider", "Groq") ?: "Groq"
+        if (!prefs.contains(providerKey("api_key", provider))) {
+            prefs.edit().putString(providerKey("api_key", provider), prefs.getString("api_key", ""))
+                .putString(providerKey("custom_model_name", provider), prefs.getString("custom_model_name", ""))
+                .putString(providerKey("custom_endpoint_url", provider), prefs.getString("custom_endpoint_url", ""))
+                .remove("api_key").remove("custom_model_name").remove("custom_endpoint_url").apply()
+        }
+    }
+    private fun providerKey(field: String, provider: String) = "$field:${provider.lowercase(Locale.ROOT)}"
+
     private val _settings = MutableStateFlow(loadSettings())
     val settings: StateFlow<FlowMindSettings> = _settings.asStateFlow()
 
@@ -45,27 +59,17 @@ class ReminderRepository(
     suspend fun insertReminder(reminder: ReminderItem): Long = reminderDao.insertReminder(reminder)
 
     suspend fun updateReminder(reminder: ReminderItem) = reminderDao.updateReminder(reminder)
+    suspend fun updateDetails(reminder: ReminderItem) = reminderDao.updateDetails(reminder)
 
     suspend fun deleteReminder(reminder: ReminderItem) = reminderDao.deleteReminder(reminder)
 
     suspend fun deleteReminderById(id: Long) = reminderDao.deleteReminderById(id)
 
-    suspend fun toggleCompleted(reminder: ReminderItem) {
-        val updated = reminder.copy(
-            isCompleted = !reminder.isCompleted,
-            completedAtMillis = if (!reminder.isCompleted) System.currentTimeMillis() else null
-        )
-        reminderDao.updateReminder(updated)
-    }
+    suspend fun toggleCompleted(reminder: ReminderItem) =
+        reminderDao.changeCompletion(reminder.id, reminder.isCompleted, System.currentTimeMillis())
 
-    suspend fun snoozeReminder(reminder: ReminderItem, additionalMillis: Long) {
-        val newDue = reminder.dueDateMillis + additionalMillis
-        val updated = reminder.copy(
-            dueDateMillis = newDue,
-            dueTimeString = "+1h Extended"
-        )
-        reminderDao.updateReminder(updated)
-    }
+    suspend fun snoozeReminder(reminder: ReminderItem, additionalMillis: Long) =
+        reminderDao.snoozeActiveReminder(reminder.id, reminder.dueDateMillis, additionalMillis, System.currentTimeMillis())
 
     suspend fun getReminderById(id: Long): ReminderItem? = reminderDao.getReminderById(id)
 
@@ -77,13 +81,14 @@ class ReminderRepository(
     }
 
     private fun loadSettings(): FlowMindSettings {
-        val storedKey = prefs.getString("api_key", "") ?: ""
+        val provider = prefs.getString("llm_provider", "Groq") ?: "Groq"
+        val storedKey = prefs.getString(providerKey("api_key", provider), "") ?: ""
         return FlowMindSettings(
-            llmProvider = prefs.getString("llm_provider", "Groq") ?: "Groq",
+            llmProvider = provider,
             apiKey = storedKey,
-            customEndpointUrl = prefs.getString("custom_endpoint_url", "") ?: "",
-            customModelName = prefs.getString("custom_model_name", "") ?: "",
-            isKeyVerified = storedKey.isNotBlank(),
+            customEndpointUrl = prefs.getString(providerKey("custom_endpoint_url", provider), "") ?: "",
+            customModelName = prefs.getString(providerKey("custom_model_name", provider), "") ?: "",
+            isKeyVerified = false,
             offlineFallback = prefs.getBoolean("offline_fallback", true),
             formatPipeline = prefs.getString("format_pipeline", "JSON") ?: "JSON",
             exportDestination = prefs.getString("export_destination", "Local") ?: "Local",
@@ -99,24 +104,24 @@ class ReminderRepository(
 
     fun updateLlmProvider(provider: String) {
         prefs.edit().putString("llm_provider", provider).apply()
-        _settings.value = _settings.value.copy(llmProvider = provider)
+        _settings.value = loadSettings()
     }
 
     fun updateApiKey(key: String) {
         val trimmed = key.trim()
-        prefs.edit().putString("api_key", trimmed).apply()
-        _settings.value = _settings.value.copy(apiKey = trimmed, isKeyVerified = trimmed.isNotBlank())
+        prefs.edit().putString(providerKey("api_key", _settings.value.llmProvider), trimmed).apply()
+        _settings.value = _settings.value.copy(apiKey = trimmed, isKeyVerified = false)
     }
 
     fun updateCustomEndpointUrl(url: String) {
         val trimmed = url.trim()
-        prefs.edit().putString("custom_endpoint_url", trimmed).apply()
+        prefs.edit().putString(providerKey("custom_endpoint_url", _settings.value.llmProvider), trimmed).apply()
         _settings.value = _settings.value.copy(customEndpointUrl = trimmed)
     }
 
     fun updateCustomModelName(model: String) {
         val trimmed = model.trim()
-        prefs.edit().putString("custom_model_name", trimmed).apply()
+        prefs.edit().putString(providerKey("custom_model_name", _settings.value.llmProvider), trimmed).apply()
         _settings.value = _settings.value.copy(customModelName = trimmed)
     }
 
