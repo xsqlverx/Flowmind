@@ -50,7 +50,7 @@ class FeedbackUiTest {
         phase(FeedbackPhase.MESSAGE)
         val before = compose.onNodeWithTag("app_feedback").fetchSemanticsNode().boundsInRoot
         File("build/outputs/flowmind-review").mkdirs()
-        compose.onNodeWithTag("app_feedback").captureRoboImage("build/outputs/flowmind-review/feedback-expanded.png")
+        compose.onNodeWithTag("app_feedback").captureRoboImage("build/outputs/flowmind-review/feedback-top-expanded.png")
         compose.mainClock.advanceTimeBy(2_100)
         phase(FeedbackPhase.COMPACT)
         compose.mainClock.advanceTimeBy(400)

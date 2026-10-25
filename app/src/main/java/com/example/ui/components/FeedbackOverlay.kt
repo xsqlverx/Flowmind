@@ -23,7 +23,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,9 +57,13 @@ private class FeedbackReveal(private val progress: Float) : Shape {
     }
 }
 
-private object WindowCenter : PopupPositionProvider {
-    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize) =
-        IntOffset((windowSize.width - popupContentSize.width) / 2, (windowSize.height - popupContentSize.height) / 2)
+internal class FeedbackTopPosition(private val topInset: Int, private val gap: Int) : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+        // Use the window, not the invoking button or sheet, so every message has the same home.
+        val x = ((windowSize.width - popupContentSize.width) / 2).coerceAtLeast(0)
+        val y = (topInset + gap).coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+        return IntOffset(x, y)
+    }
 }
 
 enum class FeedbackPhase { ICON, MESSAGE, COMPACT, EXIT }
@@ -69,20 +75,25 @@ var SemanticsPropertyReceiver.feedbackPhase by FeedbackPhaseKey
 fun FeedbackOverlay(event: FeedbackEvent?, onFinished: (Long) -> Unit) {
     val resumed = rememberAppResumed()
     val motion = rememberMotionEnabled()
+    val density = LocalDensity.current
+    val topInset = WindowInsets.safeDrawing.getTop(density)
+    val gap = with(density) { 12.dp.roundToPx() }
+    val placement = remember(topInset, gap) { FeedbackTopPosition(topInset, gap) }
     // Unconsumed feedback starts again when the app returns; background time never eats a message.
     if (event != null && resumed) key(event.id) {
-        Popup(popupPositionProvider = WindowCenter, properties = PopupProperties(focusable = false,
+        Popup(popupPositionProvider = placement, properties = PopupProperties(focusable = false,
             dismissOnBackPress = false, dismissOnClickOutside = false, clippingEnabled = false)) {
-            FeedbackCapsule(event, motion, onFinished)
+            FeedbackCapsule(event, motion, topInset + gap, onFinished)
         }
     }
 }
 
 @Composable
-private fun FeedbackCapsule(event: FeedbackEvent, motion: Boolean, onFinished: (Long) -> Unit) {
+private fun FeedbackCapsule(event: FeedbackEvent, motion: Boolean, topOffset: Int, onFinished: (Long) -> Unit) {
     val expanded = remember { Animatable(if (motion) 0f else 1f) }
     val appearance = remember { Animatable(if (motion) 0f else 1f) }
     val departure = remember { Animatable(0f) }
+    var capsuleHeight by remember { mutableIntStateOf(0) }
     var phase by remember { mutableStateOf(if (motion) FeedbackPhase.ICON else FeedbackPhase.MESSAGE) }
     val complete by rememberUpdatedState(onFinished)
     val accessibility = LocalAccessibilityManager.current
@@ -104,12 +115,11 @@ private fun FeedbackCapsule(event: FeedbackEvent, motion: Boolean, onFinished: (
             expanded.animateTo(0f, tween(240, easing = FastOutSlowInEasing))
             delay(100)
             phase = FeedbackPhase.EXIT
-            departure.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+            departure.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
         } else appearance.animateTo(0f, tween(120))
         complete(event.id)
     }
     val width = (LocalConfiguration.current.screenWidthDp - 48).coerceIn(56, 380).dp
-    val flight = (LocalConfiguration.current.screenHeightDp / 2 + 56).dp
     val reveal = FeedbackReveal(expanded.value)
     val tint = if (event.kind == FeedbackKind.ERROR) Error else Primary
     val icon = when (event.kind) {
@@ -123,11 +133,11 @@ private fun FeedbackCapsule(event: FeedbackEvent, motion: Boolean, onFinished: (
         FeedbackKind.INFO -> Icons.Outlined.Info
     }
     // Measure the complete text once. Clipping reveals it without reflowing it during expansion.
-    Box(Modifier.width(width).graphicsLayer {
+    Box(Modifier.width(width).onSizeChanged { capsuleHeight = it.height }.graphicsLayer {
         alpha = appearance.value * (1f - ((departure.value - .45f) / .55f).coerceIn(0f, 1f))
         scaleX = .86f + .14f * appearance.value
         scaleY = scaleX
-        translationY = -flight.toPx() * departure.value
+        translationY = -(topOffset + capsuleHeight + 24.dp.toPx()) * departure.value
         shadowElevation = 20.dp.toPx()
         shape = reveal
     }.testTag("app_feedback").semantics(mergeDescendants = true) {

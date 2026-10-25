@@ -4,7 +4,7 @@ Local APK compilation was stopped at the user's request. No subsequent Gradle ta
 
 ## Source checks
 
-- Passed: Kotlin grammar parsing across 49 source/test files and XML parsing across 12 files.
+- Passed: Kotlin grammar parsing across 50 source/test files and XML parsing across 12 files.
 - Passed: project import/reference checks and `git diff --check`.
 - These are source checks, not evidence of a successful Android build or working device microphone.
 
@@ -23,9 +23,10 @@ The existing signing setup is retained; the cloud environment must provide its e
 - `NotificationDeliveryTest`: actual receiver-handler/Room/AlarmManager/NotificationManager paths, blocked permission/channel reporting, duplicate suppression, stale/deleted reminders, snooze reconstruction, completion/edit races, recovery, and exact-alarm fallback.
 - `ReminderVoiceInputTest`: consecutive dictations, ignored stale callbacks, complete recognizer cleanup, one bounded busy retry, cancelled retries, timeout recovery, permission failures, and partial/empty results. A fake speech engine exercises the production session controller without accessing a microphone.
 - `FeedbackQueueTest`: ordered delivery, repeated identical messages, stale acknowledgements, and action/error icons.
+- `FeedbackPlacementTest`: safe top inset, consistent placement across sheets/keyboard changes, and horizontal centering in right-to-left layouts.
 - `FeedbackUiTest`: icon/message/compact/upward phases, repeat messages, reduced motion, 320 dp wrapped error text, edit-sheet feedback, and preserving feedback while backgrounded. Existing static screenshots disable decorative motion for deterministic captures.
 
-There are 69 test cases in the checkout. They are prepared for cloud execution and have not been executed locally.
+There are 72 test cases in the checkout. They are prepared for cloud execution and have not been executed locally.
 
 To generate screenshot artifacts, run the unit-test task with `-Proborazzi.test.record=true` in the cloud environment.
 
@@ -47,16 +48,16 @@ No live provider call, physical speech recognition, notification delivery, nativ
 
 ## Follow-up motion and voice checks
 
-The user approved the existing visual design and reported a second-dictation failure. This update keeps the visual system, removes tab travel/zoom, adds a small ambient line, and replaces every in-app snackbar with the centered icon/capsule sequence. Feedback is queued centrally and rendered above screen content and sheets. These changes do not replace Android's background reminder notifications.
+The user approved the existing visual design and reported a second-dictation failure. The initial update kept the visual system, removed tab travel/zoom, added an ambient line, and replaced every in-app snackbar with the icon/capsule sequence. After testing, the user approved the app and requested moving the same capsule to the top and making the existing UI feel more alive. Feedback now sits below the safe top inset and uses a shorter, measured upward exit. The existing card has two flowing lines, a travelling highlight and a breathing progress halo, driven by one visible/foreground-only clock. Navigation icons have a small spring response. Feedback remains queued centrally and rendered above screen content and sheets. These changes do not replace Android's background reminder notifications.
 
 The active voice controller previously kept the recognizer after final results/errors, and its callbacks shared one active flag across sessions. It now invalidates the old listener before cancelling/destroying the engine, waits briefly before reopening, and handles one service-busy retry. Cancellation, leaving Today, backgrounding, and timeout also dispose of the session and any delayed retry. These are source repairs pending cloud and phone validation.
 
 After the cloud build:
 
 1. Dictate at least five reminders consecutively, including immediate second taps. Each final transcript should append once without restarting the app. Test cancel → start, a silent attempt → retry, background → return, and switching tabs while listening.
-2. Delete, complete, archive, restore, snooze, save/edit, export, and trigger a permission or provider error. Every in-app message should show its icon in the center, expand, compact, and exit upward. Trigger the same action twice quickly to check ordered feedback.
+2. Delete, complete, archive, restore, snooze, save/edit, export, and trigger a permission or provider error. Every in-app message should show its icon at the top below the status bar, expand, compact, and exit upward. Trigger the same action twice quickly to check ordered feedback.
 3. Check a long error at 320 dp and large text, with the keyboard open and an edit sheet visible. Background during a message; it should remain queued for your return.
-4. Watch the next-reminder line move slowly, scroll it away, and return. Check that it stays still when system animations are disabled and does not continue running with the app backgrounded. Review tab changes for a quick stationary dissolve while the dock stays in place.
+4. Watch the next-reminder currents and travelling highlight move, with a gentle pulse around the progress ring. Scroll them away and return. Check that they stay still when system animations are disabled and do not continue running with the app backgrounded. Review tab changes for a quick stationary dissolve and the selected icon's spring response while the dock stays in place. Check the capsule below a display cutout and in landscape; its appearance and expansion should remain familiar.
 
 ## Notification audit and repair
 

@@ -151,6 +151,7 @@ fun HomeContent(
             }
         }
         item(key = "next_up") {
+            val ambientPhase = rememberAmbientPhase(nextVisible)
             Column(Modifier.fillMaxWidth().flowSurface().clickable(onClick = onSchedule).padding(22.dp)) {
                 Row(Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -160,10 +161,11 @@ fun HomeContent(
                             color = OnSurface, fontWeight = FontWeight.Medium)
                         Text(next?.let { ReminderTime.label(it.dueDateMillis, timeProtocol) } ?: "Add a reminder when you need one.", color = Primary, fontSize = 12.sp, lineHeight = 19.sp)
                     }
-                    ProgressRing(if (total == 0) 0f else doneToday.toFloat() / total, if (total == 0) "—" else "$doneToday/$total")
+                    ProgressRing(if (total == 0) 0f else doneToday.toFloat() / total, if (total == 0) "—" else "$doneToday/$total",
+                        ambientPhase = ambientPhase)
                 }
                 Spacer(Modifier.height(14.dp))
-                AmbientFlow(nextVisible)
+                AmbientFlow(ambientPhase)
             }
         }
         item {

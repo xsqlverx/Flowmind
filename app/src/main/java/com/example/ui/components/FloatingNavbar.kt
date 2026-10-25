@@ -76,10 +76,15 @@ fun FloatingNavbar(activeTab: String, onTabSelected: (String) -> Unit, modifier:
                 tabs.forEachIndexed { index, tab ->
                     val selected = index == selectedIndex
                     val tint by animateColorAsState(if (selected) OnSurface else OnSurfaceVariant, label = "navigation tint")
+                    val emphasis by animateFloatAsState(if (selected) 1f else 0f,
+                        spring(dampingRatio = .65f, stiffness = 420f), label = "navigation icon settle")
                     Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(33.dp))
                         .selectable(selected = selected, role = Role.Tab, onClick = { onTabSelected(tab) }).testTag("tab_$tab"),
                         verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(icons[index], null, tint = tint, modifier = Modifier.size(22.dp))
+                        Icon(icons[index], null, tint = tint, modifier = Modifier.size(22.dp).graphicsLayer {
+                            scaleX = .96f + .08f * emphasis; scaleY = scaleX
+                            translationY = -1.dp.toPx() * emphasis
+                        })
                         Text(labels[index], color = tint, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }

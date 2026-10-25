@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -118,10 +119,22 @@ fun EmptyState(title: String, description: String, icon: ImageVector = Icons.Out
 }
 
 @Composable
-fun ProgressRing(progress: Float, label: String, modifier: Modifier = Modifier) {
+fun ProgressRing(progress: Float, label: String, modifier: Modifier = Modifier, ambientPhase: State<Float>? = null) {
     val animated by animateFloatAsState(progress.coerceIn(0f, 1f), tween(550), label = "daily progress")
     Box(modifier.size(72.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize().padding(4.dp)) {
+            if (ambientPhase != null) {
+                val breath = (kotlin.math.sin(ambientPhase.value * 4 * Math.PI).toFloat() + 1f) / 2f
+                drawCircle(Primary.copy(alpha = .025f + .035f * breath), size.minDimension / 2,
+                    style = Stroke((5f + 2f * breath).dp.toPx()))
+                if (animated > 0f) {
+                    val angle = (360 * animated - 90) * Math.PI / 180
+                    val radius = size.minDimension / 2
+                    val tip = Offset(center.x + kotlin.math.cos(angle).toFloat() * radius,
+                        center.y + kotlin.math.sin(angle).toFloat() * radius)
+                    drawCircle(Primary.copy(alpha = .08f + .1f * breath), (4f + breath).dp.toPx(), tip)
+                }
+            }
             drawArc(OutlineVariant, -90f, 360f, false, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
             if (animated > 0f) drawArc(Primary, -90f, 360f * animated, false, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
         }
