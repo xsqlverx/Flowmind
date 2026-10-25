@@ -3,6 +3,7 @@
 The supplied HTML is a reference draft, not an implementation directive. The Pinterest references set the direction: charcoal surfaces, generous negative space, clear white type, and small instrument-like details. The video contributes the moving selection treatment; the navigation image contributes the cool glass rim.
 
 - Background #090A0C. Surface #18191D. Chalk #F3F2EF. Secondary text #A5A6AF. Ice #D4E5F5 is reserved for selections and progress.
+- The launcher uses the header's three rounded bars (short–tall–short), in Ice on the same charcoal background. Adaptive and themed icons share the vector mark; standard and round legacy assets are generated at all five Android densities. The mark stays inside the adaptive icon safe zone.
 - 24 dp page gutters, 24–32 dp between sections, 48 dp minimum actions. Let titles wrap; support large text and short screens with scrolling.
 - Today prioritizes capture and the next actual reminder. Schedule filters timestamps, not decorative time strings. Done uses completion dates. Settings progressively discloses optional AI configuration.
 - Native Compose throughout. Page changes now have a 660 ms entrance sequence: the heading arrives first, then cards, controls, and reminder rows lift and settle in a short stagger while the old page recedes. The header and dock stay anchored. Page entrances do not restart during scrolling or ordinary recomposition; reduced motion reveals the final layout directly.

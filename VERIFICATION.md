@@ -8,6 +8,8 @@ Local APK compilation was stopped at the user's request. No subsequent Gradle ta
 - Passed: project import/reference checks and `git diff --check`.
 - These are source checks, not evidence of a successful Android build or working device microphone.
 
+Launcher artwork now matches the in-app three-bar header mark. The foreground/background vectors were updated, all ten standard/round legacy WebP assets were regenerated and decoded successfully at their expected density sizes, and the adaptive/round/themed references were checked. The geometry fits inside the central 66 dp safe circle. A local preview of standard, round and an example themed treatment was visually inspected. No APK was compiled; launcher rendering on the phone remains a cloud-build/device check.
+
 The cloud build of the motion update reported `FeedbackOverlay.kt:50 Unresolved reference 'Rounded'`. The theme's `Outline` color conflicted with the Compose graphics type in the expression. The overlay now fully qualifies the graphics type and imports only the colors it uses. The capsule animation and voice-session changes remain intact. This correction still requires a successful cloud compilation; grammar and project-import checks did not catch this Kotlin name-resolution error.
 
 ## Cloud validation
