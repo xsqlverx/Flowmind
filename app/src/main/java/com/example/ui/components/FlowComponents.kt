@@ -76,7 +76,7 @@ fun RoundAction(icon: ImageVector, label: String, onClick: () -> Unit, modifier:
 
 @Composable
 fun ScreenHeading(title: String, subtitle: String, action: (@Composable () -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().pageArrival().padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, fontSize = 36.sp, lineHeight = 40.sp, letterSpacing = (-1.3).sp, fontWeight = FontWeight.SemiBold, color = OnSurface)
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = OnSurfaceVariant)
@@ -87,7 +87,7 @@ fun ScreenHeading(title: String, subtitle: String, action: (@Composable () -> Un
 
 @Composable
 fun SectionHeading(title: String, detail: String? = null, onClick: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().pageArrival(3).padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, Modifier.weight(1f), fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = OnSurface)
         if (detail != null) {
             if (onClick != null) TextButton(onClick) { Text(detail, color = OnSurfaceVariant) }
@@ -107,7 +107,7 @@ fun QuietChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: M
 
 @Composable
 fun EmptyState(title: String, description: String, icon: ImageVector = Icons.Outlined.CheckCircle) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally,
+    Column(Modifier.fillMaxWidth().pageArrival(3).padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(64.dp).background(SurfaceContainerLow, CircleShape), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = OnSurfaceVariant, modifier = Modifier.size(27.dp))
@@ -147,7 +147,7 @@ fun ReminderRow(reminder: ReminderItem, timeProtocol: String = "12h", onComplete
     onSnooze: () -> Unit = {}, onReschedule: () -> Unit = {}, onDelete: () -> Unit = {}, modifier: Modifier = Modifier,
     onArchive: (() -> Unit)? = null) {
     var menu by remember { mutableStateOf(false) }
-    SwipeToDismissReminderBox(modifier = modifier, onDelete = onDelete,
+    SwipeToDismissReminderBox(modifier = modifier.pageArrival(4), onDelete = onDelete,
         onStartToEnd = if (reminder.isArchived) onComplete else onArchive,
         startToEndLabel = if (reminder.isArchived) "Restore" else "Archive",
         startToEndIcon = if (reminder.isArchived) Icons.Outlined.Restore else Icons.Outlined.Archive,

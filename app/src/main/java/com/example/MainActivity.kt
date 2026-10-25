@@ -84,19 +84,29 @@ fun FlowMindFrame(activeTab: String, onTabSelected: (String) -> Unit, content: @
     val backdrop = rememberGraphicsLayer()
     var origin by remember { mutableStateOf(Offset.Zero) }
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val ambientPhase = rememberAmbientPhase(visible = true)
+    val motion = rememberMotionEnabled()
     Box(Modifier.fillMaxSize().background(Surface).navigationBarsPadding().imePadding()) {
-        Column(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }.drawWithContent {
+        Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }.drawWithContent {
             backdrop.record { this@drawWithContent.drawContent() }
             drawLayer(backdrop)
-        }.background(Surface).statusBarsPadding()) {
-            TopHeader(if (activeTab == "settings") "Settings" else "Today", { onTabSelected("settings") })
-            AnimatedContent(activeTab, modifier = Modifier.fillMaxSize(), label = "page transition", transitionSpec = {
-                // Tabs switch in place; the fixed shell and moving dock carry the continuity.
-                fadeIn(tween(160)) togetherWith fadeOut(tween(100))
-            }) { tab -> content(tab) }
+        }) {
+            LivingBackdrop(ambientPhase, Modifier.matchParentSize())
+            CompositionLocalProvider(LocalAmbientPhase provides ambientPhase) {
+                Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                    TopHeader(if (activeTab == "settings") "Settings" else "Today", { onTabSelected("settings") })
+                    AnimatedContent(activeTab, modifier = Modifier.fillMaxSize(), label = "page transition", transitionSpec = {
+                        // Sections arrive on their own clock; the old page recedes while they unfold.
+                        if (motion) fadeIn(tween(180, 40)) togetherWith (fadeOut(tween(180)) + scaleOut(tween(220), targetScale = .985f))
+                        else EnterTransition.None togetherWith ExitTransition.None
+                    }) { tab -> PageScene(tab) { content(tab) } }
+                }
+            }
         }
         AnimatedVisibility(!keyboardVisible, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
-            FloatingNavbar(activeTab, onTabSelected, backdrop = backdrop, backdropOrigin = origin)
+            CompositionLocalProvider(LocalAmbientPhase provides ambientPhase) {
+                FloatingNavbar(activeTab, onTabSelected, backdrop = backdrop, backdropOrigin = origin)
+            }
         }
     }
 }

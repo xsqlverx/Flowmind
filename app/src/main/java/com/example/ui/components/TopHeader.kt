@@ -17,12 +17,14 @@ import com.example.ui.theme.*
 
 @Composable
 fun TopHeader(currentScreenTitle: String, onQuickActionClick: () -> Unit = {}) {
+    val ambient = LocalAmbientPhase.current
     Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Canvas(Modifier.size(26.dp)) {
             for (i in 0..2) {
                 val x = size.width * (.2f + i * .3f)
-                val inset = if (i == 1) .12f else .28f
+                val breath = kotlin.math.sin((ambient?.value ?: 0f) * 2 * Math.PI + i * 1.4).toFloat() * .035f
+                val inset = (if (i == 1) .12f else .28f) + breath
                 drawLine(Primary, Offset(x, size.height * inset), Offset(x, size.height * (1 - inset)), 3.dp.toPx(), StrokeCap.Round)
             }
         }

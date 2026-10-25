@@ -151,8 +151,8 @@ fun HomeContent(
             }
         }
         item(key = "next_up") {
-            val ambientPhase = rememberAmbientPhase(nextVisible)
-            Column(Modifier.fillMaxWidth().flowSurface().clickable(onClick = onSchedule).padding(22.dp)) {
+            val ambientPhase = LocalAmbientPhase.current ?: rememberAmbientPhase(nextVisible)
+            Column(Modifier.fillMaxWidth().pageArrival(1).flowSurface().clickable(onClick = onSchedule).padding(22.dp)) {
                 Row(Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -169,7 +169,7 @@ fun HomeContent(
             }
         }
         item {
-            Column(Modifier.fillMaxWidth().flowSurface(28).animateContentSize().padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Column(Modifier.fillMaxWidth().pageArrival(2).flowSurface(28).animateContentSize().padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("OFF YOUR MIND", color = OnSurfaceVariant, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f))

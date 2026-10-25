@@ -59,7 +59,7 @@ fun ScheduleContent(reminders: List<ReminderItem>, query: String = "", filter: S
             RoundAction(Icons.Outlined.Add, "Create a reminder", onAdd)
         } }
         item {
-            Column(Modifier.fillMaxWidth().flowSurface().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.fillMaxWidth().pageArrival(1).flowSurface().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(ReminderTime.format(days.first(), "MMMM yyyy"), color = OnSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     IconButton({ weekOffset-- }, Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Previous week", tint = OnSurfaceVariant) }
@@ -84,13 +84,13 @@ fun ScheduleContent(reminders: List<ReminderItem>, query: String = "", filter: S
             }
         }
         item {
-            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().testTag("search_input"), placeholder = { Text("Find a reminder") },
+            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().pageArrival(2).testTag("search_input"), placeholder = { Text("Find a reminder") },
                 leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(20.dp)) }, singleLine = true, shape = RoundedCornerShape(22.dp),
                 trailingIcon = if (query.isNotEmpty()) { { IconButton({ onQuery("") }) { Icon(Icons.Outlined.Close, "Clear search") } } } else null,
                 colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = OutlineVariant, focusedBorderColor = Primary))
         }
         item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.pageArrival(3).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("All", "Today", "Tomorrow", "This week", "Priority").forEach { label ->
                     QuietChip(label, selectedDay == null && filter == label, { onDay(null); onFilter(label) })
                 }

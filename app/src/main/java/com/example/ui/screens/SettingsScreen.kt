@@ -153,7 +153,7 @@ fun SettingsContent(settings: FlowMindSettings, count: Int = 0, latency: String 
             }
         }
         item {
-            SettingsGroup("Your rhythm") {
+            SettingsGroup("Your rhythm", 2) {
                 Text("Snooze for", fontSize = 14.sp, color = OnSurface)
                 ChoiceRow(listOf("15 min", "30 min", "1 hour", "2 hours"), listOf("15 min", "30 min", "1 hour", "2 hours").indexOf(settings.snoozeLatency)) {
                     onSnooze(listOf("15 min", "30 min", "1 hour", "2 hours")[it])
@@ -164,7 +164,7 @@ fun SettingsContent(settings: FlowMindSettings, count: Int = 0, latency: String 
             }
         }
         item {
-            Column(Modifier.fillMaxWidth().flowSurface().animateContentSize().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.fillMaxWidth().pageArrival(3).flowSurface().animateContentSize().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(Modifier.fillMaxWidth().clickable { aiExpanded = !aiExpanded }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("A little help from AI", fontSize = 18.sp, fontWeight = FontWeight.Medium, color = OnSurface)
@@ -198,7 +198,7 @@ fun SettingsContent(settings: FlowMindSettings, count: Int = 0, latency: String 
             }
         }
         item {
-            SettingsGroup("Keep a copy") {
+            SettingsGroup("Keep a copy", 4) {
                 Text("$count reminders, ready to take with you.", color = OnSurfaceVariant, fontSize = 13.sp)
                 ChoiceRow(listOf("JSON", "Markdown", "Calendar"), listOf("JSON", "MD", ".ICS").indexOf(settings.formatPipeline)) { onFormat(listOf("JSON", "MD", ".ICS")[it]) }
                 ChoiceRow(listOf("Save a file", "Share / Dropbox"), if (settings.exportDestination == "Local") 0 else 1) { onDestination(if (it == 0) "Local" else "Dropbox") }
@@ -212,8 +212,8 @@ fun SettingsContent(settings: FlowMindSettings, count: Int = 0, latency: String 
 }
 
 @Composable
-private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().flowSurface().padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun SettingsGroup(title: String, arrivalIndex: Int = 1, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().pageArrival(arrivalIndex).flowSurface().padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(title, color = OnSurface, fontSize = 18.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
         content()
     }

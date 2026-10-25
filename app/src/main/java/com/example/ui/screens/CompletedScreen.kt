@@ -51,7 +51,7 @@ fun DoneContent(reminders: List<ReminderItem>, filter: String = "All", timeProto
         verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item { ScreenHeading("Look at you go.", "A little less on your mind.") }
         item {
-            Row(Modifier.fillMaxWidth().flowSurface().padding(24.dp), verticalAlignment = Alignment.CenterVertically,
+            Row(Modifier.fillMaxWidth().pageArrival(1).flowSurface().padding(24.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("$doneToday", fontSize = 48.sp, letterSpacing = (-2).sp, color = OnSurface, fontWeight = FontWeight.Medium)
@@ -64,7 +64,7 @@ fun DoneContent(reminders: List<ReminderItem>, filter: String = "All", timeProto
             }
         }
         item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.pageArrival(2).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("All", "Today", "This week", "Archived").forEach { QuietChip(it, filter == it, { onFilter(it) }) }
             }
         }
