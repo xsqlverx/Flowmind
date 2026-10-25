@@ -19,7 +19,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Outline as GraphicsOutline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalAccessibilityManager
@@ -47,11 +46,11 @@ import com.example.ui.theme.SurfaceContainerLow
 import kotlinx.coroutines.delay
 
 private class FeedbackReveal(private val progress: Float) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): GraphicsOutline = with(density) {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): androidx.compose.ui.graphics.Outline = with(density) {
         val diameter = 56.dp.toPx()
         val width = diameter + (size.width - diameter) * progress
         val height = diameter + (size.height - diameter) * progress
-        GraphicsOutline.Rounded(RoundRect((size.width - width) / 2, (size.height - height) / 2,
+        androidx.compose.ui.graphics.Outline.Rounded(RoundRect((size.width - width) / 2, (size.height - height) / 2,
             (size.width + width) / 2, (size.height + height) / 2, CornerRadius(28.dp.toPx())))
     }
 }
