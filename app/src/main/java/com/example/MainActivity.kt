@@ -11,8 +11,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
@@ -25,7 +23,6 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -59,12 +56,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun FlowMindApp(viewModel: ReminderViewModel) {
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
-    val message by viewModel.toastMessage.collectAsStateWithLifecycle()
+    val feedback by viewModel.feedback.collectAsStateWithLifecycle()
     val editing by viewModel.editingReminder.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val holder = rememberSaveableStateHolder()
     BackHandler(currentTab != "home" && editing == null) { viewModel.setTab("home") }
-    FlowMindFrame(currentTab, viewModel::setTab, message) { tab ->
+    FlowMindFrame(currentTab, viewModel::setTab) { tab ->
         holder.SaveableStateProvider(tab) {
             when (tab) {
                 "upcoming" -> UpcomingScreen(viewModel)
@@ -74,15 +71,19 @@ fun FlowMindApp(viewModel: ReminderViewModel) {
             }
         }
     }
-    editing?.let { EditReminderDialog(it, { viewModel.setEditingReminder(null) }, viewModel::saveEditedReminder, settings.timeProtocol) }
+    val edit = editing
+    if (edit != null) {
+        EditReminderDialog(edit, { viewModel.setEditingReminder(null) }, viewModel::saveEditedReminder, settings.timeProtocol) {
+            FeedbackOverlay(feedback, viewModel::finishFeedback)
+        }
+    } else FeedbackOverlay(feedback, viewModel::finishFeedback)
 }
 
 @Composable
-fun FlowMindFrame(activeTab: String, onTabSelected: (String) -> Unit, message: String? = null, content: @Composable (String) -> Unit) {
+fun FlowMindFrame(activeTab: String, onTabSelected: (String) -> Unit, content: @Composable (String) -> Unit) {
     val backdrop = rememberGraphicsLayer()
     var origin by remember { mutableStateOf(Offset.Zero) }
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val order = listOf("home", "upcoming", "completed", "settings")
     Box(Modifier.fillMaxSize().background(Surface).navigationBarsPadding().imePadding()) {
         Column(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }.drawWithContent {
             backdrop.record { this@drawWithContent.drawContent() }
@@ -90,19 +91,12 @@ fun FlowMindFrame(activeTab: String, onTabSelected: (String) -> Unit, message: S
         }.background(Surface).statusBarsPadding()) {
             TopHeader(if (activeTab == "settings") "Settings" else "Today", { onTabSelected("settings") })
             AnimatedContent(activeTab, modifier = Modifier.fillMaxSize(), label = "page transition", transitionSpec = {
-                val direction = if (order.indexOf(targetState) >= order.indexOf(initialState)) 1 else -1
-                (fadeIn(tween(200, 30)) + slideInHorizontally(tween(240)) { direction * it / 24 }) togetherWith
-                    (fadeOut(tween(140)) + slideOutHorizontally(tween(200)) { -direction * it / 32 })
+                // Tabs switch in place; the fixed shell and moving dock carry the continuity.
+                fadeIn(tween(160)) togetherWith fadeOut(tween(100))
             }) { tab -> content(tab) }
         }
         AnimatedVisibility(!keyboardVisible, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
             FloatingNavbar(activeTab, onTabSelected, backdrop = backdrop, backdropOrigin = origin)
-        }
-        AnimatedVisibility(message != null, Modifier.align(Alignment.BottomCenter).padding(horizontal = 24.dp, vertical = if (keyboardVisible) 12.dp else 108.dp),
-            enter = fadeIn() + slideInVertically { it / 2 }, exit = fadeOut()) {
-            Snackbar(containerColor = SurfaceContainerHighest, contentColor = OnSurface, modifier = Modifier.testTag("app_toast")) {
-                Text(message.orEmpty())
-            }
         }
     }
 }

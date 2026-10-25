@@ -23,13 +23,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.util.Log
 import com.example.util.HapticFeedbackHelper
+import com.example.ui.feedback.FeedbackQueue
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
 class ReminderViewModel(application: Application, private val savedState: SavedStateHandle = SavedStateHandle()) : AndroidViewModel(application) {
+    private val feedbackQueue = FeedbackQueue()
+    val feedback = feedbackQueue.current
+    fun finishFeedback(id: Long) = feedbackQueue.finish(id)
+
     private val repository = ReminderRepository(AppDatabase.getDatabase(application).reminderDao(), application)
     init { NotificationHelper.initNotificationChannels(application); refreshNotificationSchedule() }
     val allReminders = repository.allReminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -58,10 +62,10 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
     fun synthesizeWithLlm() {
         if (_isLlmSynthesizing.value) return
         val text = composerText.value.trim()
-        if (text.isBlank()) { showToast("Write a reminder first."); return }
+        if (text.isBlank()) { showFeedback("Write a reminder first."); return }
         val configuration = settings.value
         val local = LlmReminderClient.isLocalEndpoint(configuration.llmProvider, configuration.customEndpointUrl)
-        if (configuration.apiKey.isBlank() && !local) { showToast("Add your ${configuration.llmProvider} API key in settings to refine this draft."); return }
+        if (configuration.apiKey.isBlank() && !local) { showFeedback("Add your ${configuration.llmProvider} API key in settings to refine this draft."); return }
         val revision = draftRevision
         _isLlmSynthesizing.value = true
         viewModelScope.launch {
@@ -71,10 +75,10 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
                 if (revision != draftRevision || configuration != settings.value) return@launch
                 if (result.isSuccess) {
                     _parsedResult.value = result.getOrThrow()
-                    showToast("Preview refined. Check the details before saving.")
+                    showFeedback("Preview refined. Check the details before saving.")
                 } else {
                     if (configuration.offlineFallback) _parsedResult.value = NlpReminderParser.parse(text)
-                    showToast("Couldn't refine this draft. ${if (configuration.offlineFallback) "Kept your local preview." else "Your draft is unchanged."}")
+                    showFeedback("Couldn't refine this draft. ${if (configuration.offlineFallback) "Kept your local preview." else "Your draft is unchanged."}")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -88,7 +92,7 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
         // Reparse relative dates on save; an AI preview is preserved only for the current draft.
         val preview = _parsedResult.value
         val result = if (preview.parsingEngine.contains("Keyword Classifier")) NlpReminderParser.parse(text) else preview
-        if (text.isBlank() || result.cleanTitle.isBlank()) { showToast("Give your reminder a title first."); return }
+        if (text.isBlank() || result.cleanTitle.isBlank()) { showFeedback("Give your reminder a title first."); return }
         val revision = draftRevision
         val reminder = ReminderItem(title = result.cleanTitle, notes = result.notes, category = result.category, tag = result.tag,
             priority = result.priority, dueDateMillis = result.dueDateMillis, dueTimeString = ReminderTime.label(result.dueDateMillis, settings.value.timeProtocol),
@@ -100,7 +104,7 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
                 val schedule = ReminderNotificationScheduler.scheduleReminder(getApplication(), reminder.copy(id = id), settings.value.notificationLeadMinutes)
                 if (revision == draftRevision) updateComposerText("")
                 HapticFeedbackHelper.triggerCreationHaptic(getApplication())
-                showToast(when {
+                showFeedback(when {
                     schedule == ReminderScheduleResult.FAILED -> "Reminder saved, but its alert couldn't be scheduled. Retry from settings."
                     !NotificationHelper.canPost(getApplication()) -> "Reminder saved. Allow notifications to receive alerts."
                     schedule == ReminderScheduleResult.APPROXIMATE -> "Reminder saved. Allow precise alarms for on-time alerts."
@@ -109,7 +113,7 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                showToast("Couldn't save the reminder. Your draft is still here.")
+                showFeedback("Couldn't save the reminder. Your draft is still here.")
             } finally { _isSaving.value = false }
         }
     }
@@ -140,18 +144,18 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                showToast("Couldn't update this reminder. Please try again.")
+                showFeedback("Couldn't update this reminder. Please try again.")
             } finally { pendingIds.remove(item.id) }
         }
     }
     fun saveEditedReminder(item: ReminderItem) {
-        if (item.title.isBlank()) { showToast("A reminder needs a title."); return }
+        if (item.title.isBlank()) { showFeedback("A reminder needs a title."); return }
         updateReminder(item) {
             val updated = repository.updateDetails(item) ?: return@updateReminder
             ReminderNotificationScheduler.scheduleReminder(getApplication(), updated, settings.value.notificationLeadMinutes)
             _editingReminder.value = null
             HapticFeedbackHelper.triggerCreationHaptic(getApplication())
-            showToast("Changes saved")
+            showFeedback("Changes saved")
         }
     }
     fun toggleCompleted(item: ReminderItem) = updateReminder(item) {
@@ -161,11 +165,11 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
             ReminderNotificationScheduler.cancelReminder(getApplication(), item.id)
             NotificationHelper.dismissNotification(getApplication(), item.id.toInt())
             change.next?.let { ReminderNotificationScheduler.scheduleReminder(getApplication(), it, settings.value.notificationLeadMinutes) }
-            showToast(if (change.next == null) "Consider it done." else "Done. The next repeat is scheduled.")
+            showFeedback(if (change.next == null) "Consider it done." else "Done. The next repeat is scheduled.")
         } else {
             withContext(Dispatchers.IO) { NotificationState(getApplication()).clear(item.id) }
             ReminderNotificationScheduler.scheduleReminder(getApplication(), change.updated, settings.value.notificationLeadMinutes)
-            showToast("Reminder restored")
+            showFeedback("Reminder restored")
         }
     }
     fun deleteReminder(item: ReminderItem) = updateReminder(item) {
@@ -174,28 +178,28 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
         withContext(Dispatchers.IO) { NotificationState(getApplication()).clear(item.id) }
         ReminderNotificationScheduler.cancelReminder(getApplication(), item.id)
         NotificationHelper.dismissNotification(getApplication(), item.id.toInt())
-        showToast("Reminder deleted")
+        showFeedback("Reminder deleted")
     }
     fun archiveReminder(item: ReminderItem) = updateReminder(item) {
         repository.archiveReminder(item) ?: return@updateReminder
         ReminderNotificationScheduler.cancelReminder(getApplication(), item.id)
         NotificationHelper.dismissNotification(getApplication(), item.id.toInt())
         HapticFeedbackHelper.triggerDismissHaptic(getApplication())
-        showToast("Reminder archived")
+        showFeedback("Reminder archived")
     }
     fun restoreArchivedReminder(item: ReminderItem) = updateReminder(item) {
         val updated = repository.restoreArchivedReminder(item) ?: return@updateReminder
         withContext(Dispatchers.IO) { NotificationState(getApplication()).clear(item.id) }
         ReminderNotificationScheduler.scheduleReminder(getApplication(), updated, settings.value.notificationLeadMinutes)
         HapticFeedbackHelper.triggerCreationHaptic(getApplication())
-        showToast("Reminder restored")
+        showFeedback("Reminder restored")
     }
     fun snoozeReminder(item: ReminderItem) = updateReminder(item) {
         val updated = repository.snoozeReminder(item, ReminderTime.snoozeMillis(settings.value.snoozeLatency)) ?: return@updateReminder
         withContext(Dispatchers.IO) { NotificationState(getApplication()).markSnoozed(item.id, updated.dueDateMillis) }
         ReminderNotificationScheduler.scheduleReminder(getApplication(), updated, 0)
         NotificationHelper.dismissNotification(getApplication(), item.id.toInt())
-        showToast("Snoozed for ${settings.value.snoozeLatency}")
+        showFeedback("Snoozed for ${settings.value.snoozeLatency}")
     }
     fun rescheduleReminder(item: ReminderItem) = updateReminder(item) {
         val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
@@ -205,20 +209,15 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
         }.timeInMillis
         val updated = repository.updateDetails(item.copy(dueDateMillis = due, dueTimeString = ReminderTime.label(due, settings.value.timeProtocol))) ?: return@updateReminder
         ReminderNotificationScheduler.scheduleReminder(getApplication(), updated, settings.value.notificationLeadMinutes)
-        showToast("Moved to tomorrow")
+        showFeedback("Moved to tomorrow")
     }
     fun clearCompletedOlderThan30Days() { viewModelScope.launch {
         val count = repository.clearCompletedOlderThan30Days()
-        showToast(if (count == 0) "No older reminders to clear" else "Cleared $count older reminders")
+        showFeedback(if (count == 0) "No older reminders to clear" else "Cleared $count older reminders")
     } }
 
-    private val _toastMessage = MutableStateFlow<String?>(null)
-    val toastMessage = _toastMessage.asStateFlow()
-    private var messageRevision = 0
-    fun showToast(message: String) {
-        val revision = ++messageRevision
-        _toastMessage.value = message
-        viewModelScope.launch { delay(4500); if (messageRevision == revision) _toastMessage.value = null }
+    fun showFeedback(message: String) {
+        feedbackQueue.enqueue(message)
     }
     fun setLlmProvider(provider: String) { repository.updateLlmProvider(provider); _gatewayLatency.value = "Not tested" }
     fun setApiKey(key: String) { repository.updateApiKey(key); _gatewayLatency.value = "Not tested" }
@@ -232,14 +231,14 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
     fun setTimeProtocol(protocol: String) = repository.updateTimeProtocol(protocol)
     fun refreshNotificationSchedule() { viewModelScope.launch {
         try { ReminderNotificationScheduler.rescheduleAllActiveReminders(getApplication()) }
-        catch (error: Exception) { Log.e("FlowMindAlarms", "Couldn't refresh reminder alarms", error); showToast("Couldn't refresh reminder alerts. Please try again.") }
+        catch (error: Exception) { Log.e("FlowMindAlarms", "Couldn't refresh reminder alarms", error); showFeedback("Couldn't refresh reminder alerts. Please try again.") }
     } }
     fun setNotificationsEnabled(enabled: Boolean) { repository.updateNotificationsEnabled(enabled); refreshNotificationSchedule() }
     fun setNotificationLeadMinutes(minutes: Int) { repository.updateNotificationLeadMinutes(minutes); refreshNotificationSchedule() }
     fun setNotificationSoundEnabled(enabled: Boolean) = repository.updateNotificationSoundEnabled(enabled)
     fun setNotificationHeadsUp(enabled: Boolean) = repository.updateNotificationHeadsUp(enabled)
     fun sendTestNotification() {
-        showToast(when (NotificationHelper.sendTestNotification(getApplication())) {
+        showFeedback(when (NotificationHelper.sendTestNotification(getApplication())) {
             NotificationPostResult.POSTED -> "Test posted. Check your notification shade."
             NotificationPostResult.BLOCKED -> "Notifications are blocked. Allow them in Android settings."
             else -> "Couldn't post a test notification. Check Android notification settings."
@@ -268,6 +267,6 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = payload.mimeType; putExtra(Intent.EXTRA_SUBJECT, payload.fileName); putExtra(Intent.EXTRA_TEXT, payload.content)
             }, "Share reminders").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }.onFailure { showToast("Couldn't open sharing. Try saving a file instead.") }
+        }.onFailure { showFeedback("Couldn't open sharing. Try saving a file instead.") }
     }
 }

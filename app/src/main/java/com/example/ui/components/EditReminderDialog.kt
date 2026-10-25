@@ -24,7 +24,8 @@ import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditReminderDialog(reminder: ReminderItem, onDismiss: () -> Unit, onSave: (ReminderItem) -> Unit, timeProtocol: String = "12h") {
+fun EditReminderDialog(reminder: ReminderItem, onDismiss: () -> Unit, onSave: (ReminderItem) -> Unit,
+    timeProtocol: String = "12h", feedback: @Composable () -> Unit = {}) {
     var title by rememberSaveable(reminder.id) { mutableStateOf(reminder.title) }
     var notes by rememberSaveable(reminder.id) { mutableStateOf(reminder.notes) }
     var category by rememberSaveable(reminder.id) { mutableStateOf(reminder.category) }
@@ -77,5 +78,7 @@ fun EditReminderDialog(reminder: ReminderItem, onDismiss: () -> Unit, onSave: (R
                     Modifier.weight(1f).heightIn(min = 52.dp).testTag("save_edit_button"), enabled = title.isNotBlank(), shape = RoundedCornerShape(20.dp)) { Text("Save changes") }
             }
         }
+        // Popups must belong to the sheet's window to stay above its scrim and controls.
+        feedback()
     }
 }

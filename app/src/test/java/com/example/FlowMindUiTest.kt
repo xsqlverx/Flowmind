@@ -10,6 +10,7 @@ import com.example.data.nlp.NlpReminderParser
 import com.example.data.repository.FlowMindSettings
 import com.example.ui.screens.*
 import com.example.ui.theme.FlowMindTheme
+import com.example.ui.components.LocalMotionEnabled
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -40,32 +41,32 @@ class FlowMindUiTest {
         compose.onRoot().captureRoboImage("build/outputs/flowmind-review/$name.png")
     }
     @Test fun today_screenshot() {
-        compose.setContent { FlowMindTheme { FlowMindFrame("home", {}) { HomeContent(reminders, "", NlpReminderParser.parse(""), now = now) } } }
+        compose.setContent { CompositionLocalProvider(LocalMotionEnabled provides false) { FlowMindTheme { FlowMindFrame("home", {}) { HomeContent(reminders, "", NlpReminderParser.parse(""), now = now) } } } }
         capture("today")
     }
     @Test fun schedule_screenshot() {
-        compose.setContent { FlowMindTheme { FlowMindFrame("upcoming", {}) { ScheduleContent(reminders.filter { !it.isCompleted }, now = now) } } }
+        compose.setContent { CompositionLocalProvider(LocalMotionEnabled provides false) { FlowMindTheme { FlowMindFrame("upcoming", {}) { ScheduleContent(reminders.filter { !it.isCompleted }, now = now) } } } }
         capture("schedule")
     }
     @Test fun completed_screenshot() {
-        compose.setContent { FlowMindTheme { FlowMindFrame("completed", {}) { DoneContent(reminders.filter { it.isCompleted }, now = now) } } }
+        compose.setContent { CompositionLocalProvider(LocalMotionEnabled provides false) { FlowMindTheme { FlowMindFrame("completed", {}) { DoneContent(reminders.filter { it.isCompleted }, now = now) } } } }
         capture("done")
     }
     @Test fun settings_screenshot() {
-        compose.setContent { FlowMindTheme { FlowMindFrame("settings", {}) { SettingsContent(FlowMindSettings(), 3) } } }
+        compose.setContent { CompositionLocalProvider(LocalMotionEnabled provides false) { FlowMindTheme { FlowMindFrame("settings", {}) { SettingsContent(FlowMindSettings(), 3) } } } }
         capture("settings")
     }
     @Test fun navigation_reaches_each_screen_and_exposes_selected_state() {
         compose.setContent {
             var tab by remember { mutableStateOf("home") }
-            FlowMindTheme { FlowMindFrame(tab, { tab = it }) { current ->
+            CompositionLocalProvider(LocalMotionEnabled provides false) { FlowMindTheme { FlowMindFrame(tab, { tab = it }) { current ->
                 when (current) {
                     "upcoming" -> ScheduleContent(emptyList(), now = now)
                     "completed" -> DoneContent(emptyList(), now = now)
                     "settings" -> SettingsContent(FlowMindSettings())
                     else -> HomeContent(emptyList(), "", NlpReminderParser.parse(""), now = now)
                 }
-            } }
+            } } }
         }
         compose.onNodeWithTag("tab_upcoming").performClick().assertIsSelected()
         compose.onNodeWithText("A little ahead.").assertIsDisplayed()
@@ -78,9 +79,9 @@ class FlowMindUiTest {
         var saves = 0
         compose.setContent {
             var draft by remember { mutableStateOf("") }
-            FlowMindTheme { FlowMindFrame("home", {}) {
+            CompositionLocalProvider(LocalMotionEnabled provides false) { FlowMindTheme { FlowMindFrame("home", {}) {
                 HomeContent(emptyList(), draft, NlpReminderParser.parse(draft, now), now = now, onText = { draft = it }, onAdd = { saves++ })
-            } }
+            } } }
         }
         compose.onNodeWithTag("home_list").performScrollToNode(hasTestTag("add_reminder_button"))
         compose.onNodeWithTag("add_reminder_button").assertIsNotEnabled()
@@ -94,9 +95,9 @@ class FlowMindUiTest {
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
-                FlowMindTheme { FlowMindFrame("home", {}) {
+                CompositionLocalProvider(LocalMotionEnabled provides false) { FlowMindTheme { FlowMindFrame("home", {}) {
                     HomeContent(reminders, "", NlpReminderParser.parse(""), now = now)
-                } }
+                } } }
             }
         }
         compose.onNodeWithTag("home_list").performScrollToNode(hasTestTag("add_reminder_button"))

@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -69,7 +70,7 @@ fun HomeScreen(viewModel: ReminderViewModel, onNavigateToUpcoming: () -> Unit) {
     val voice = remember(context, viewModel) {
         ReminderVoiceInput(context, { transcript ->
             viewModel.updateComposerText(listOf(viewModel.composerText.value.trim(), transcript).filter { it.isNotBlank() }.joinToString(" "))
-        }, viewModel::showToast)
+        }, viewModel::showFeedback)
     }
     DisposableEffect(owner, voice) {
         val observer = LifecycleEventObserver { _, event ->
@@ -85,13 +86,13 @@ fun HomeScreen(viewModel: ReminderViewModel, onNavigateToUpcoming: () -> Unit) {
     }
     LaunchedEffect(editing?.id) { if (editing != null) voice.cancel() }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) voice.start() else viewModel.showToast("Microphone access wasn't granted. You can enable it in Android app settings.")
+        if (granted) voice.start() else viewModel.showFeedback("Microphone access wasn't granted. You can enable it in Android app settings.")
     }
     LaunchedEffect(settings.notificationHeadsUp) { alertsAvailable = NotificationHelper.canPost(context) }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         alertsAvailable = NotificationHelper.canPost(context)
         if (granted) viewModel.refreshNotificationSchedule()
-        else viewModel.showToast("Allow notifications in settings to receive reminder alerts.")
+        else viewModel.showFeedback("Allow notifications in settings to receive reminder alerts.")
     }
     HomeContent(reminders, text, parsed, settings.timeProtocol, refining, saving, voice.isListening, voice.isProcessing,
         voice.partialTranscript, voice.level, rememberNow(), viewModel::updateComposerText,
@@ -135,7 +136,9 @@ fun HomeContent(
     val doneToday = reminders.count { it.isCompleted && it.completedAtMillis?.let { time -> ReminderTime.sameDay(time, now) } == true }
     val next = active.firstOrNull()
     val total = today.size + doneToday
-    LazyColumn(Modifier.fillMaxSize().testTag("home_list"), contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 120.dp),
+    val scroll = rememberLazyListState()
+    val nextVisible by remember { derivedStateOf { scroll.layoutInfo.visibleItemsInfo.any { it.key == "next_up" } } }
+    LazyColumn(Modifier.fillMaxSize().testTag("home_list"), state = scroll, contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             ScreenHeading("Your day,\nuncluttered.", ReminderTime.format(now, "EEEE, d MMMM"))
@@ -147,16 +150,20 @@ fun HomeContent(
                 TextButton(onNotificationSettings) { Text("Set up", fontSize = 12.sp) }
             }
         }
-        item {
-            Row(Modifier.fillMaxWidth().flowSurface().clickable(onClick = onSchedule).padding(22.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (next != null) "NEXT UP" else "A LITTLE HEADSPACE", color = OnSurfaceVariant, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Medium)
-                    Text(next?.title ?: "Nothing on your mind?\nKeep it that way.", fontSize = 20.sp, lineHeight = 28.sp,
-                        color = OnSurface, fontWeight = FontWeight.Medium)
-                    Text(next?.let { ReminderTime.label(it.dueDateMillis, timeProtocol) } ?: "Add a reminder when you need one.", color = Primary, fontSize = 12.sp, lineHeight = 19.sp)
+        item(key = "next_up") {
+            Column(Modifier.fillMaxWidth().flowSurface().clickable(onClick = onSchedule).padding(22.dp)) {
+                Row(Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(if (next != null) "NEXT UP" else "A LITTLE HEADSPACE", color = OnSurfaceVariant, fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Medium)
+                        Text(next?.title ?: "Nothing on your mind?\nKeep it that way.", fontSize = 20.sp, lineHeight = 28.sp,
+                            color = OnSurface, fontWeight = FontWeight.Medium)
+                        Text(next?.let { ReminderTime.label(it.dueDateMillis, timeProtocol) } ?: "Add a reminder when you need one.", color = Primary, fontSize = 12.sp, lineHeight = 19.sp)
+                    }
+                    ProgressRing(if (total == 0) 0f else doneToday.toFloat() / total, if (total == 0) "—" else "$doneToday/$total")
                 }
-                ProgressRing(if (total == 0) 0f else doneToday.toFloat() / total, if (total == 0) "—" else "$doneToday/$total")
+                Spacer(Modifier.height(14.dp))
+                AmbientFlow(nextVisible)
             }
         }
         item {

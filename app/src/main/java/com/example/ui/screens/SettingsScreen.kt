@@ -75,7 +75,7 @@ fun SettingsScreen(viewModel: ReminderViewModel) {
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         notificationsGranted = hasPermission()
         viewModel.setNotificationsEnabled(granted)
-        if (!granted) viewModel.showToast("Notifications are blocked. You can allow them in Android app settings.")
+        if (!granted) viewModel.showFeedback("Notifications are blocked. You can allow them in Android app settings.")
     }
     LaunchedEffect(settings.notificationHeadsUp) { notificationsGranted = hasPermission() }
     val saveFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
@@ -85,7 +85,7 @@ fun SettingsScreen(viewModel: ReminderViewModel) {
                 val stream = context.contentResolver.openOutputStream(uri) ?: error("Couldn't open the selected file")
                 stream.bufferedWriter(Charsets.UTF_8).use { it.write(payload.content) }
             } }
-            viewModel.showToast(if (result.isSuccess) "Saved ${reminders.size} reminders" else "Couldn't save the export. Please try another location.")
+            viewModel.showFeedback(if (result.isSuccess) "Saved ${reminders.size} reminders" else "Couldn't save the export. Please try another location.")
         }
     }
     SettingsContent(settings, reminders.size, latency, testing, notificationsGranted, exactGranted,
@@ -95,15 +95,15 @@ fun SettingsScreen(viewModel: ReminderViewModel) {
             else viewModel.setNotificationsEnabled(enabled)
         }, onExactPermission = {
             if (Build.VERSION.SDK_INT >= 31) runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))) }
-                .onFailure { viewModel.showToast("Open Android settings → Special app access → Alarms & reminders.") }
+                .onFailure { viewModel.showFeedback("Open Android settings → Special app access → Alarms & reminders.") }
         }, onAppSettings = { openNotificationSettings() },
         onTest = {
-            if (!notificationsGranted) viewModel.showToast("Allow notifications first, then send a test.") else viewModel.sendTestNotification()
+            if (!notificationsGranted) viewModel.showFeedback("Allow notifications first, then send a test.") else viewModel.sendTestNotification()
         }, onLead = viewModel::setNotificationLeadMinutes, onSound = viewModel::setNotificationSoundEnabled,
         onHeadsUp = viewModel::setNotificationHeadsUp, onQuiet = viewModel::setSmartQuietHours,
         onSnooze = viewModel::setSnoozeLatency, onTime = viewModel::setTimeProtocol,
         onProvider = viewModel::setLlmProvider, onSaveAi = { key, model, endpoint ->
-            viewModel.setApiKey(key); viewModel.setCustomModelName(model); viewModel.setCustomEndpointUrl(endpoint); viewModel.showToast("AI settings saved")
+            viewModel.setApiKey(key); viewModel.setCustomModelName(model); viewModel.setCustomEndpointUrl(endpoint); viewModel.showFeedback("AI settings saved")
         }, onFallback = viewModel::setOfflineFallback, onTestConnection = viewModel::testConnection,
         onFormat = viewModel::setFormatPipeline, onDestination = viewModel::setExportDestination,
         onExport = {
