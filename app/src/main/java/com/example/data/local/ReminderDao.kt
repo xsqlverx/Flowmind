@@ -45,6 +45,15 @@ interface ReminderDao {
         return updated
     }
 
+    @Transaction
+    suspend fun setArchived(id: Long, archived: Boolean, now: Long): ReminderItem? {
+        val current = getReminderById(id) ?: return null
+        val updated = current.copy(isArchived = archived, isCompleted = archived,
+            completedAtMillis = if (archived) current.completedAtMillis ?: now else null)
+        updateReminder(updated)
+        return updated
+    }
+
     @Query("SELECT * FROM reminders WHERE id = :id LIMIT 1")
     suspend fun getReminderById(id: Long): ReminderItem?
 

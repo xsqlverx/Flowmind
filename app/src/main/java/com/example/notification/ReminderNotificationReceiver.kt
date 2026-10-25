@@ -43,7 +43,7 @@ class ReminderNotificationReceiver : BroadcastReceiver() {
                 val now = System.currentTimeMillis()
                 if (reminder.dueDateMillis < now - NotificationTiming.CATCH_UP_WINDOW_MILLIS) return@withLock
                 val expected = intent.getLongExtra(EXTRA_TRIGGER_MILLIS,
-                    reminder.dueDateMillis - if (state.isSnoozed(id, reminder.dueDateMillis)) 0 else prefs.getInt("notification_lead_minutes", 0) * 60_000L)
+                    reminder.dueDateMillis - if (state.isSnoozed(id, reminder.dueDateMillis)) 0L else prefs.getInt("notification_lead_minutes", 0) * 60_000L)
                 if (expected > now + 5_000) {
                     ReminderNotificationScheduler.scheduleReminder(context, reminder, prefs.getInt("notification_lead_minutes", 0))
                     return@withLock

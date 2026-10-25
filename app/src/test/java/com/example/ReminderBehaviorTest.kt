@@ -97,4 +97,15 @@ class ReminderBehaviorTest {
         assertFalse(LlmReminderClient.isLocalEndpoint("Custom", "https://10.example.com/v1/chat/completions"))
         assertFalse(LlmReminderClient.isLocalEndpoint("Custom", "https://localhost.example.com/v1/chat/completions"))
     }
+    @Test fun `archiving suppresses active reminders and restoring clears completion`() = runBlocking {
+        val dao = database.reminderDao()
+        val id = dao.insertReminder(ReminderItem(title = "Archive me"))
+        val archived = dao.setArchived(id, true, System.currentTimeMillis())!!
+        assertTrue(archived.isArchived)
+        assertTrue(dao.getActiveRemindersList().isEmpty())
+        val restored = dao.setArchived(id, false, System.currentTimeMillis())!!
+        assertFalse(restored.isArchived)
+        assertFalse(restored.isCompleted)
+        assertNull(restored.completedAtMillis)
+    }
 }

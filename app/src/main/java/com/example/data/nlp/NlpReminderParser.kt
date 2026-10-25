@@ -250,11 +250,17 @@ object NlpReminderParser {
         val monthDateRegex = Regex("""(?i)\b(?:on\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b""")
         val dateMonthRegex = Regex("""(?i)\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b""")
 
-        // Specific time format: e.g. "at 4:30 pm", "4:30pm", "3pm", "11:00 am"
-        val specificTimeRegex = Regex("""(?i)(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b""")
-        val colonTimeRegex = Regex("""(?i)\b(?:at\s+)(\d{1,2}):(\d{2})\b""")
-        val oclockTimeRegex = Regex("""(?i)\b(?:at\s+)(\d{1,2})\s*o'?clock\b""")
-        val bareAtTimeRegex = Regex("""(?i)\b(?:at\s+)(\d{1,2})\b""")
+        // Specific time regexes supporting both colon (:) and dot (.) separators:
+        // Examples: "at 7.00pm", "7.00pm", "7:00pm", "7.00 pm", "7:00 pm", "7.00p.m.", "7:00 a.m.", "3pm", "11:00 am"
+        // Also captures optional trailing full-stop so sentence endings like "at 7.00pm." do not leave orphan dots
+        val specificTimeWithAmPmRegex = Regex("""(?i)(?:\b(?:at|by|around|@)\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)\.?(?!\w)""")
+
+        // Separated time without AM/PM: e.g. "at 7.00", "at 7:00", "7:00", "7.00", "19:00", "19.00"
+        val separatedTimeRegex = Regex("""(?i)(?:\b(?:at|by|around|@)\s+)?(\d{1,2})[:.](\d{2})\.?(?!\w)""")
+
+        // O'clock and bare time: e.g. "at 7 o'clock", "7 oclock", "at 7"
+        val oclockTimeRegex = Regex("""(?i)\b(?:at\s+)?(\d{1,2})\s*o'?clock\.?(?!\w)""")
+        val bareAtTimeRegex = Regex("""(?i)\b(?:at|by|around|@)\s+(\d{1,2})\.?(?!\w)""")
 
         // Evaluate Relative Times first
         val inMinMatch = inMinutesRegex.find(working)
@@ -265,6 +271,8 @@ object NlpReminderParser {
         if (inMinMatch != null) {
             val mins = inMinMatch.groupValues[1].toIntOrNull() ?: 15
             calendar.add(Calendar.MINUTE, mins)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
             dueTimeString = "In $mins mins ($timeStr)"
             dateSpecified = true
@@ -272,6 +280,8 @@ object NlpReminderParser {
             working = working.replace(inMinMatch.value, "").trim()
         } else if (inHalfHourRegex.containsMatchIn(working)) {
             calendar.add(Calendar.MINUTE, 30)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
             dueTimeString = "In 30 mins ($timeStr)"
             dateSpecified = true
@@ -279,6 +289,8 @@ object NlpReminderParser {
             working = working.replace(inHalfHourRegex.find(working)!!.value, "").trim()
         } else if (inAnHourRegex.containsMatchIn(working)) {
             calendar.add(Calendar.HOUR_OF_DAY, 1)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
             dueTimeString = "In 1 hour ($timeStr)"
             dateSpecified = true
@@ -287,6 +299,8 @@ object NlpReminderParser {
         } else if (inHrMatch != null) {
             val hrs = inHrMatch.groupValues[1].toIntOrNull() ?: 2
             calendar.add(Calendar.HOUR_OF_DAY, hrs)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
             dueTimeString = "In $hrs hours ($timeStr)"
             dateSpecified = true
@@ -297,6 +311,8 @@ object NlpReminderParser {
             calendar.add(Calendar.DAY_OF_YEAR, days)
             calendar.set(Calendar.HOUR_OF_DAY, 9)
             calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             val dateStr = SimpleDateFormat("MMM d", Locale.getDefault()).format(calendar.time)
             dueTimeString = "In $days days ($dateStr · 9:00 AM)"
             dateSpecified = true
@@ -306,6 +322,8 @@ object NlpReminderParser {
             calendar.add(Calendar.WEEK_OF_YEAR, weeks)
             calendar.set(Calendar.HOUR_OF_DAY, 9)
             calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             val dateStr = SimpleDateFormat("MMM d", Locale.getDefault()).format(calendar.time)
             dueTimeString = "In $weeks weeks ($dateStr)"
             dateSpecified = true
@@ -319,6 +337,8 @@ object NlpReminderParser {
                     calendar.add(Calendar.DAY_OF_YEAR, 2)
                     calendar.set(Calendar.HOUR_OF_DAY, 9)
                     calendar.set(Calendar.MINUTE, 0)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
                     dueTimeString = "Day After Tomorrow"
                     dateSpecified = true
                     working = working.replace(dayAfterTomorrowRegex.find(working)!!.value, "").trim()
@@ -327,6 +347,8 @@ object NlpReminderParser {
                     calendar.add(Calendar.DAY_OF_YEAR, 1)
                     calendar.set(Calendar.HOUR_OF_DAY, 9)
                     calendar.set(Calendar.MINUTE, 0)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
                     dueTimeString = "Tomorrow"
                     dateSpecified = true
                     working = working.replace(tomorrowRegex.find(working)!!.value, "").trim()
@@ -334,31 +356,36 @@ object NlpReminderParser {
                 tonightRegex.containsMatchIn(working) -> {
                     calendar.set(Calendar.HOUR_OF_DAY, 20)
                     calendar.set(Calendar.MINUTE, 0)
-                    dueTimeString = "Tonight, 8:00 PM"
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    dueTimeString = "Tonight"
                     dateSpecified = true
-                    timeSpecified = true
                     working = working.replace(tonightRegex.find(working)!!.value, "").trim()
                 }
                 afternoonRegex.containsMatchIn(working) -> {
                     calendar.set(Calendar.HOUR_OF_DAY, 14)
                     calendar.set(Calendar.MINUTE, 0)
-                    dueTimeString = "This Afternoon, 2:00 PM"
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    dueTimeString = "This Afternoon"
                     dateSpecified = true
-                    timeSpecified = true
                     working = working.replace(afternoonRegex.find(working)!!.value, "").trim()
                 }
                 morningRegex.containsMatchIn(working) -> {
                     calendar.set(Calendar.HOUR_OF_DAY, 9)
                     calendar.set(Calendar.MINUTE, 0)
-                    dueTimeString = "This Morning, 9:00 AM"
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    dueTimeString = "This Morning"
                     dateSpecified = true
-                    timeSpecified = true
                     working = working.replace(morningRegex.find(working)!!.value, "").trim()
                 }
                 noonRegex.containsMatchIn(working) -> {
                     calendar.set(Calendar.HOUR_OF_DAY, 12)
                     calendar.set(Calendar.MINUTE, 0)
-                    dueTimeString = "Today, 12:00 PM (Noon)"
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    dueTimeString = "Today · 12:00 PM"
                     dateSpecified = true
                     timeSpecified = true
                     working = working.replace(noonRegex.find(working)!!.value, "").trim()
@@ -367,6 +394,8 @@ object NlpReminderParser {
                     calendar.add(Calendar.DAY_OF_YEAR, 1)
                     calendar.set(Calendar.HOUR_OF_DAY, 0)
                     calendar.set(Calendar.MINUTE, 0)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
                     dueTimeString = "Midnight (12:00 AM)"
                     dateSpecified = true
                     timeSpecified = true
@@ -375,7 +404,9 @@ object NlpReminderParser {
                 eodRegex.containsMatchIn(working) -> {
                     calendar.set(Calendar.HOUR_OF_DAY, 17)
                     calendar.set(Calendar.MINUTE, 0)
-                    dueTimeString = "Today by 5:00 PM (EOD)"
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    dueTimeString = "Today · 5:00 PM"
                     dateSpecified = true
                     timeSpecified = true
                     working = working.replace(eodRegex.find(working)!!.value, "").trim()
@@ -386,7 +417,9 @@ object NlpReminderParser {
                     calendar.add(Calendar.DAY_OF_YEAR, if (daysUntilSaturday == 0) 7 else daysUntilSaturday)
                     calendar.set(Calendar.HOUR_OF_DAY, 10)
                     calendar.set(Calendar.MINUTE, 0)
-                    dueTimeString = "This Weekend (Sat, 10:00 AM)"
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    dueTimeString = "This Weekend (Sat · 10:00 AM)"
                     dateSpecified = true
                     timeSpecified = true
                     working = working.replace(thisWeekendRegex.find(working)!!.value, "").trim()
@@ -397,6 +430,8 @@ object NlpReminderParser {
                     calendar.add(Calendar.DAY_OF_YEAR, daysUntilNextMonday)
                     calendar.set(Calendar.HOUR_OF_DAY, 9)
                     calendar.set(Calendar.MINUTE, 0)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
                     val dateStr = SimpleDateFormat("MMM d", Locale.getDefault()).format(calendar.time)
                     dueTimeString = "Next Week ($dateStr · 9:00 AM)"
                     dateSpecified = true
@@ -426,6 +461,8 @@ object NlpReminderParser {
                         calendar.add(Calendar.DAY_OF_YEAR, diff)
                         calendar.set(Calendar.HOUR_OF_DAY, 9)
                         calendar.set(Calendar.MINUTE, 0)
+                        calendar.set(Calendar.SECOND, 0)
+                        calendar.set(Calendar.MILLISECOND, 0)
                         val formattedDay = dayName.replaceFirstChar { it.uppercase() }
                         dueTimeString = formattedDay
                         dateSpecified = true
@@ -441,6 +478,8 @@ object NlpReminderParser {
                             calendar.set(Calendar.DAY_OF_MONTH, dayNum)
                             calendar.set(Calendar.HOUR_OF_DAY, 9)
                             calendar.set(Calendar.MINUTE, 0)
+                            calendar.set(Calendar.SECOND, 0)
+                            calendar.set(Calendar.MILLISECOND, 0)
                             // If date has passed in current year, schedule for next year
                             if (calendar.timeInMillis < now - 86400000L) {
                                 calendar.add(Calendar.YEAR, 1)
@@ -455,111 +494,190 @@ object NlpReminderParser {
             }
         }
 
-        // Specific Time Check (e.g. "at 4:30 pm", "3pm", "10am", "at 16:00", "at 5")
-        val specTimeMatch = specificTimeRegex.find(working)
-        val colonTimeMatch = colonTimeRegex.find(working)
-        val oclockMatch = oclockTimeRegex.find(working)
-        val bareAtMatch = bareAtTimeRegex.find(working)
-
-        if (specTimeMatch != null) {
-            var hr = specTimeMatch.groupValues[1].toInt()
-            val min = specTimeMatch.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }?.toInt() ?: 0
-            val amPm = specTimeMatch.groupValues[3].lowercase(Locale.ROOT)
-            if (amPm == "pm" && hr < 12) hr += 12
-            if (amPm == "am" && hr == 12) hr = 0
-
-            calendar.set(Calendar.HOUR_OF_DAY, hr)
-            calendar.set(Calendar.MINUTE, min)
-            calendar.set(Calendar.SECOND, 0)
-            timeSpecified = true
-
-            val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
-            dueTimeString = if (dateSpecified) {
-                "$dueTimeString · $formattedTime"
-            } else {
-                "Today · $formattedTime"
+        // Specific Time Check supporting both dot (.) and colon (:)
+        val amPmMatch = specificTimeWithAmPmRegex.find(working)
+        val sepMatch = if (amPmMatch == null) {
+            separatedTimeRegex.findAll(working).firstOrNull { match ->
+                val startIndex = match.range.first
+                val isCurrencySymbol = startIndex > 0 && (working[startIndex - 1] == '$' || working[startIndex - 1] == '€' || working[startIndex - 1] == '£')
+                val afterText = working.substring((match.range.last + 1).coerceAtMost(working.length)).trimStart()
+                val isCurrencyWord = afterText.startsWith("dollar", ignoreCase = true) ||
+                        afterText.startsWith("buck", ignoreCase = true) ||
+                        afterText.startsWith("%")
+                val hr = match.groupValues[1].toIntOrNull() ?: -1
+                val min = match.groupValues[2].toIntOrNull() ?: -1
+                !isCurrencySymbol && !isCurrencyWord && hr in 0..23 && min in 0..59
             }
-            working = working.replace(specTimeMatch.value, "").trim()
-        } else if (colonTimeMatch != null) {
-            val hr = colonTimeMatch.groupValues[1].toInt()
-            val min = colonTimeMatch.groupValues[2].toInt()
+        } else null
+        val oclockMatch = if (amPmMatch == null && sepMatch == null) oclockTimeRegex.find(working) else null
+        val bareAtMatch = if (amPmMatch == null && sepMatch == null && oclockMatch == null) bareAtTimeRegex.find(working) else null
+
+        if (amPmMatch != null) {
+            var hr = amPmMatch.groupValues[1].toInt()
+            val min = amPmMatch.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }?.toInt() ?: 0
+            val amPmRaw = amPmMatch.groupValues[3].lowercase(Locale.ROOT).replace(".", "")
+            if (amPmRaw == "pm" && hr < 12) hr += 12
+            if (amPmRaw == "am" && hr == 12) hr = 0
+
             calendar.set(Calendar.HOUR_OF_DAY, hr)
             calendar.set(Calendar.MINUTE, min)
             calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             timeSpecified = true
 
             val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
-            dueTimeString = if (dateSpecified) "$dueTimeString · $formattedTime" else "Today · $formattedTime"
-            working = working.replace(colonTimeMatch.value, "").trim()
+            dueTimeString = when {
+                dueTimeString == "Tonight" -> "Tonight · $formattedTime"
+                dueTimeString == "Tomorrow" -> "Tomorrow · $formattedTime"
+                dueTimeString == "Day After Tomorrow" -> "Day After Tomorrow · $formattedTime"
+                dueTimeString == "This Afternoon" || dueTimeString == "This Morning" -> "Today · $formattedTime"
+                dateSpecified -> "$dueTimeString · $formattedTime"
+                else -> "Today · $formattedTime"
+            }
+            working = working.removeRange(amPmMatch.range).trim()
+        } else if (sepMatch != null) {
+            var hr = sepMatch.groupValues[1].toInt()
+            val min = sepMatch.groupValues[2].toInt()
+
+            // Heuristic for times without AM/PM:
+            // 1..6 -> default to afternoon PM (13..18)
+            // 7..11 -> if current hour >= hr, default to PM (19..23)
+            if (hr in 1..6) {
+                hr += 12
+            } else if (hr in 7..11) {
+                val currentHour = Calendar.getInstance().apply { timeInMillis = now }.get(Calendar.HOUR_OF_DAY)
+                if (dueTimeString == "Tonight" || dueTimeString == "This Afternoon" || currentHour >= hr) {
+                    hr += 12
+                }
+            }
+
+            calendar.set(Calendar.HOUR_OF_DAY, hr)
+            calendar.set(Calendar.MINUTE, min)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            timeSpecified = true
+
+            val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
+            dueTimeString = when {
+                dueTimeString == "Tonight" -> "Tonight · $formattedTime"
+                dueTimeString == "Tomorrow" -> "Tomorrow · $formattedTime"
+                dueTimeString == "Day After Tomorrow" -> "Day After Tomorrow · $formattedTime"
+                dueTimeString == "This Afternoon" || dueTimeString == "This Morning" -> "Today · $formattedTime"
+                dateSpecified -> "$dueTimeString · $formattedTime"
+                else -> "Today · $formattedTime"
+            }
+            working = working.removeRange(sepMatch.range).trim()
         } else if (oclockMatch != null) {
             var hr = oclockMatch.groupValues[1].toInt()
-            if (hr in 1..6) hr += 12 // Default 1-6 o'clock to PM
+            if (hr in 1..6) {
+                hr += 12
+            } else if (hr in 7..11) {
+                val currentHour = Calendar.getInstance().apply { timeInMillis = now }.get(Calendar.HOUR_OF_DAY)
+                if (dueTimeString == "Tonight" || dueTimeString == "This Afternoon" || currentHour >= hr) {
+                    hr += 12
+                }
+            }
             calendar.set(Calendar.HOUR_OF_DAY, hr)
             calendar.set(Calendar.MINUTE, 0)
             calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             timeSpecified = true
 
             val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
-            dueTimeString = if (dateSpecified) "$dueTimeString · $formattedTime" else "Today · $formattedTime"
-            working = working.replace(oclockMatch.value, "").trim()
+            dueTimeString = when {
+                dueTimeString == "Tonight" -> "Tonight · $formattedTime"
+                dueTimeString == "Tomorrow" -> "Tomorrow · $formattedTime"
+                dueTimeString == "Day After Tomorrow" -> "Day After Tomorrow · $formattedTime"
+                dueTimeString == "This Afternoon" || dueTimeString == "This Morning" -> "Today · $formattedTime"
+                dateSpecified -> "$dueTimeString · $formattedTime"
+                else -> "Today · $formattedTime"
+            }
+            working = working.removeRange(oclockMatch.range).trim()
         } else if (bareAtMatch != null) {
             var hr = bareAtMatch.groupValues[1].toInt()
-            if (hr in 1..6) hr += 12
-            if (hr in 1..24) {
+            if (hr in 1..6) {
+                hr += 12
+            } else if (hr in 7..11) {
+                val currentHour = Calendar.getInstance().apply { timeInMillis = now }.get(Calendar.HOUR_OF_DAY)
+                if (currentHour >= hr) {
+                    hr += 12
+                }
+            }
+            if (hr in 0..23) {
                 calendar.set(Calendar.HOUR_OF_DAY, hr)
                 calendar.set(Calendar.MINUTE, 0)
                 calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
                 timeSpecified = true
+
                 val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
                 dueTimeString = if (dateSpecified) "$dueTimeString · $formattedTime" else "Today · $formattedTime"
-                working = working.replace(bareAtMatch.value, "").trim()
+                working = working.removeRange(bareAtMatch.range).trim()
             }
         }
 
-        // If time was not specified and only date was, default to standard morning/afternoon slot
+        // If time was specified for today (without explicit date) and that time has already passed today,
+        // automatically roll over to tomorrow so the reminder is scheduled ahead rather than in the past
+        if (!dateSpecified && timeSpecified) {
+            if (calendar.timeInMillis <= now) {
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+                val formattedTime = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
+                dueTimeString = "Tomorrow · $formattedTime"
+            }
+        }
+
+        // If time was not specified and only date was, default to standard morning slot (9:00 AM)
         if (dateSpecified && !timeSpecified) {
+            val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
             val monthDay = SimpleDateFormat("MMM d", Locale.getDefault()).format(calendar.time)
-            dueTimeString = "$dueTimeString ($monthDay · 9:00 AM)"
+            dueTimeString = if (dueTimeString.contains("·")) {
+                dueTimeString
+            } else {
+                "$dueTimeString ($monthDay · $timeStr)"
+            }
         }
 
         // If neither date nor time was specified, default to Today 5:00 PM (or +2h if already evening)
         if (!dateSpecified && !timeSpecified) {
             if (calendar.get(Calendar.HOUR_OF_DAY) >= 17) {
                 calendar.add(Calendar.HOUR_OF_DAY, 2)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
                 val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
                 dueTimeString = "Today · $timeStr"
             } else {
                 calendar.set(Calendar.HOUR_OF_DAY, 17)
                 calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
                 dueTimeString = "Today · 5:00 PM"
             }
-        }
-
-        // A time without a date means the next occurrence of that time.
-        if (!dateSpecified && timeSpecified && calendar.timeInMillis <= now) {
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
-            dueTimeString = "Tomorrow · ${SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)}"
         }
 
         // Add Date/Time chip to entities list
         entities.add(0, ParsedEntity(EntityType.DATE_TIME, dueTimeString, "schedule"))
         entities.add(ParsedEntity(EntityType.CATEGORY, detectedCategory, "label"))
 
-        // 7. Clean up the title from conversational prefixes & artifacts
+        // 7. Clean up the title from conversational prefixes, punctuation & artifacts
         var cleanTitle = working
             .replace(Regex("""(?i)^please remind me to\s+"""), "")
             .replace(Regex("""(?i)^can you remind me to\s+"""), "")
             .replace(Regex("""(?i)^remind me to\s+"""), "")
             .replace(Regex("""(?i)^remind me about\s+"""), "")
             .replace(Regex("""(?i)^remind me on\s+"""), "")
+            .replace(Regex("""(?i)^remind me at\s+"""), "")
             .replace(Regex("""(?i)^remind me\s+"""), "")
-            .replace(Regex("""(?i)^don'?t forget to\s+"""), "")
-            .replace(Regex("""(?i)^do not forget to\s+"""), "")
+            .replace(Regex("""(?i)^i need to be reminded (?:to|at|about)?\s*"""), "")
+            .replace(Regex("""(?i)^need to be reminded (?:to|at|about)?\s*"""), "")
+            .replace(Regex("""(?i)^i want to be reminded (?:to|at|about)?\s*"""), "")
+            .replace(Regex("""(?i)^i want to get a notification (?:to|at|about)?\s*"""), "")
             .replace(Regex("""(?i)^i need to\s+"""), "")
             .replace(Regex("""(?i)^need to\s+"""), "")
             .replace(Regex("""(?i)^i have to\s+"""), "")
             .replace(Regex("""(?i)^have to\s+"""), "")
             .replace(Regex("""(?i)^gotta\s+"""), "")
+            .replace(Regex("""(?i)^don'?t forget to\s+"""), "")
+            .replace(Regex("""(?i)^do not forget to\s+"""), "")
             .replace(Regex("""(?i)^make sure to\s+"""), "")
             .replace(Regex("""(?i)^make sure i\s+"""), "")
             .replace(Regex("""(?i)^remember to\s+"""), "")
@@ -572,16 +690,18 @@ object NlpReminderParser {
             .replace(Regex("""(?i)^ensure to\s+"""), "")
             .replace(Regex("""(?i)^alert me to\s+"""), "")
             .replace(Regex("""(?i)^notify me to\s+"""), "")
-            .replace(Regex("""[,\s]+$"""), "")
+            .replace(Regex("""(?i)\bat\s*$"""), "")
+            .replace(Regex("""^[,\s.:;!?]+"""), "")
+            .replace(Regex("""[,\s.:;!?]+$"""), "")
             .trim()
 
         if (cleanTitle.isEmpty()) {
-            cleanTitle = trimmed
+            cleanTitle = "Reminder ($dueTimeString)"
         } else {
             cleanTitle = cleanTitle.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
         }
 
-        // 8. Determine if input is the 1 in 25 that requires LLM reasoning
+        // 8. Determine if input is one of the rare complex tasks requiring LLM reasoning
         val wordCount = trimmed.split(Regex("""\s+""")).size
         val hasComplexConjunctions = trimmed.contains("because", ignoreCase = true) ||
                 trimmed.contains("in case", ignoreCase = true) ||
@@ -590,9 +710,7 @@ object NlpReminderParser {
                 trimmed.contains("summarize", ignoreCase = true) ||
                 trimmed.contains("break down", ignoreCase = true)
 
-        val needsLlm = explicitLlm ||
-                (wordCount > 18 && hasComplexConjunctions) ||
-                (cleanTitle.length < 3 && trimmed.length > 30)
+        val needsLlm = explicitLlm || (wordCount > 18 && hasComplexConjunctions)
 
         val engineName = if (needsLlm) "Gemini Neural Assistant" else "Keyword Classifier (Local)"
 

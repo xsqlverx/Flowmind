@@ -25,21 +25,24 @@ import com.example.ui.viewmodel.ReminderViewModel
 @Composable
 fun CompletedScreen(viewModel: ReminderViewModel) {
     val reminders by viewModel.completedReminders.collectAsStateWithLifecycle()
+    val archived by viewModel.archivedReminders.collectAsStateWithLifecycle()
     val tab by viewModel.selectedCompletedTab.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     DoneContent(reminders, tab, settings.timeProtocol, rememberNow(), viewModel::setCompletedTab, viewModel::toggleCompleted,
-        viewModel::setEditingReminder, viewModel::deleteReminder, viewModel::clearCompletedOlderThan30Days)
+        viewModel::setEditingReminder, viewModel::deleteReminder, viewModel::clearCompletedOlderThan30Days,
+        archived, viewModel::archiveReminder, viewModel::restoreArchivedReminder)
 }
 
 @Composable
 fun DoneContent(reminders: List<ReminderItem>, filter: String = "All", timeProtocol: String = "12h", now: Long = System.currentTimeMillis(),
     onFilter: (String) -> Unit = {}, onRestore: (ReminderItem) -> Unit = {}, onEdit: (ReminderItem) -> Unit = {},
-    onDelete: (ReminderItem) -> Unit = {}, onClear: () -> Unit = {}) {
+    onDelete: (ReminderItem) -> Unit = {}, onClear: () -> Unit = {}, archivedReminders: List<ReminderItem> = emptyList(),
+    onArchive: (ReminderItem) -> Unit = {}, onRestoreArchived: (ReminderItem) -> Unit = {}) {
     var confirmClear by remember { mutableStateOf(false) }
     val doneToday = reminders.count { it.completedAtMillis?.let { time -> ReminderTime.sameDay(time, now) } == true }
     val sevenDaysAgo = ReminderTime.startOfDay(ReminderTime.addDays(now, -6))
     val thisWeek = reminders.count { (it.completedAtMillis ?: 0) >= sevenDaysAgo }
-    val shown = reminders.filter { reminder ->
+    val shown = if (filter == "Archived") archivedReminders.sortedByDescending { it.completedAtMillis } else reminders.filter { reminder ->
         val completed = reminder.completedAtMillis ?: 0
         when (filter) { "Today" -> ReminderTime.sameDay(completed, now); "This week", "Recent" -> completed >= sevenDaysAgo; else -> true }
     }.sortedByDescending { it.completedAtMillis }
@@ -62,14 +65,15 @@ fun DoneContent(reminders: List<ReminderItem>, filter: String = "All", timeProto
         }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("All", "Today", "This week").forEach { QuietChip(it, filter == it, { onFilter(it) }) }
+                listOf("All", "Today", "This week", "Archived").forEach { QuietChip(it, filter == it, { onFilter(it) }) }
             }
         }
         if (shown.isEmpty()) item { EmptyState("Good things take a moment.", "Completed reminders appear here.\nYou can restore them whenever you need.", Icons.Outlined.DoneAll) }
         groups.forEach { (day, dayReminders) ->
             item(key = "done_heading_$day") { SectionHeading(ReminderTime.dayLabel(day, now), "${dayReminders.size}") }
             items(dayReminders, key = { it.id }) { reminder ->
-                ReminderRow(reminder, timeProtocol, { onRestore(reminder) }, { onEdit(reminder) }, onDelete = { onDelete(reminder) }, modifier = Modifier.animateItem())
+                ReminderRow(reminder, timeProtocol, { if (reminder.isArchived) onRestoreArchived(reminder) else onRestore(reminder) }, { onEdit(reminder) },
+                    onDelete = { onDelete(reminder) }, modifier = Modifier.animateItem(), onArchive = { onArchive(reminder) })
             }
         }
         if (reminders.isNotEmpty()) item {

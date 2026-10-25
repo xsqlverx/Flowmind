@@ -22,6 +22,7 @@ import com.example.notification.NotificationState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.util.Log
+import com.example.util.HapticFeedbackHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -34,6 +35,7 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
     val allReminders = repository.allReminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val activeReminders = repository.activeReminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val completedReminders = repository.completedReminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val archivedReminders = repository.archivedReminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val settings = repository.settings
 
     val currentTab = savedState.getStateFlow("tab", "home")
@@ -97,6 +99,7 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
                 val id = repository.insertReminder(reminder)
                 val schedule = ReminderNotificationScheduler.scheduleReminder(getApplication(), reminder.copy(id = id), settings.value.notificationLeadMinutes)
                 if (revision == draftRevision) updateComposerText("")
+                HapticFeedbackHelper.triggerCreationHaptic(getApplication())
                 showToast(when {
                     schedule == ReminderScheduleResult.FAILED -> "Reminder saved, but its alert couldn't be scheduled. Retry from settings."
                     !NotificationHelper.canPost(getApplication()) -> "Reminder saved. Allow notifications to receive alerts."
@@ -147,12 +150,14 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
             val updated = repository.updateDetails(item) ?: return@updateReminder
             ReminderNotificationScheduler.scheduleReminder(getApplication(), updated, settings.value.notificationLeadMinutes)
             _editingReminder.value = null
+            HapticFeedbackHelper.triggerCreationHaptic(getApplication())
             showToast("Changes saved")
         }
     }
     fun toggleCompleted(item: ReminderItem) = updateReminder(item) {
         val change = repository.toggleCompleted(item) ?: return@updateReminder
         if (change.updated.isCompleted) {
+            HapticFeedbackHelper.triggerCompletionHaptic(getApplication())
             ReminderNotificationScheduler.cancelReminder(getApplication(), item.id)
             NotificationHelper.dismissNotification(getApplication(), item.id.toInt())
             change.next?.let { ReminderNotificationScheduler.scheduleReminder(getApplication(), it, settings.value.notificationLeadMinutes) }
@@ -165,10 +170,25 @@ class ReminderViewModel(application: Application, private val savedState: SavedS
     }
     fun deleteReminder(item: ReminderItem) = updateReminder(item) {
         repository.deleteReminder(item)
+        HapticFeedbackHelper.triggerDismissHaptic(getApplication())
         withContext(Dispatchers.IO) { NotificationState(getApplication()).clear(item.id) }
         ReminderNotificationScheduler.cancelReminder(getApplication(), item.id)
         NotificationHelper.dismissNotification(getApplication(), item.id.toInt())
         showToast("Reminder deleted")
+    }
+    fun archiveReminder(item: ReminderItem) = updateReminder(item) {
+        repository.archiveReminder(item) ?: return@updateReminder
+        ReminderNotificationScheduler.cancelReminder(getApplication(), item.id)
+        NotificationHelper.dismissNotification(getApplication(), item.id.toInt())
+        HapticFeedbackHelper.triggerDismissHaptic(getApplication())
+        showToast("Reminder archived")
+    }
+    fun restoreArchivedReminder(item: ReminderItem) = updateReminder(item) {
+        val updated = repository.restoreArchivedReminder(item) ?: return@updateReminder
+        withContext(Dispatchers.IO) { NotificationState(getApplication()).clear(item.id) }
+        ReminderNotificationScheduler.scheduleReminder(getApplication(), updated, settings.value.notificationLeadMinutes)
+        HapticFeedbackHelper.triggerCreationHaptic(getApplication())
+        showToast("Reminder restored")
     }
     fun snoozeReminder(item: ReminderItem) = updateReminder(item) {
         val updated = repository.snoozeReminder(item, ReminderTime.snoozeMillis(settings.value.snoozeLatency)) ?: return@updateReminder

@@ -39,14 +39,15 @@ fun UpcomingScreen(viewModel: ReminderViewModel) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     ScheduleContent(reminders, query, filter, day, settings.timeProtocol, rememberNow(), viewModel::setSearchQuery,
         viewModel::setUpcomingFilter, viewModel::setSelectedDay, { viewModel.setTab("home") }, viewModel::setEditingReminder,
-        viewModel::toggleCompleted, viewModel::snoozeReminder, viewModel::rescheduleReminder, viewModel::deleteReminder)
+        viewModel::toggleCompleted, viewModel::snoozeReminder, viewModel::rescheduleReminder, viewModel::deleteReminder, viewModel::archiveReminder)
 }
 
 @Composable
 fun ScheduleContent(reminders: List<ReminderItem>, query: String = "", filter: String = "All", selectedDay: Long? = null,
     timeProtocol: String = "12h", now: Long = System.currentTimeMillis(), onQuery: (String) -> Unit = {},
     onFilter: (String) -> Unit = {}, onDay: (Long?) -> Unit = {}, onAdd: () -> Unit = {}, onEdit: (ReminderItem) -> Unit = {},
-    onComplete: (ReminderItem) -> Unit = {}, onSnooze: (ReminderItem) -> Unit = {}, onReschedule: (ReminderItem) -> Unit = {}, onDelete: (ReminderItem) -> Unit = {}) {
+    onComplete: (ReminderItem) -> Unit = {}, onSnooze: (ReminderItem) -> Unit = {}, onReschedule: (ReminderItem) -> Unit = {}, onDelete: (ReminderItem) -> Unit = {},
+    onArchive: (ReminderItem) -> Unit = {}) {
     var weekOffset by rememberSaveable { mutableIntStateOf(0) }
     val today = ReminderTime.startOfDay(now)
     val days = (0..6).map { ReminderTime.addDays(today, weekOffset * 7 + it) }
@@ -108,7 +109,7 @@ fun ScheduleContent(reminders: List<ReminderItem>, query: String = "", filter: S
             item(key = "heading_$day") { SectionHeading(ReminderTime.dayLabel(day, now), "${dayReminders.size}") }
             items(dayReminders, key = { it.id }) { reminder ->
                 ReminderRow(reminder, timeProtocol, { onComplete(reminder) }, { onEdit(reminder) }, { onSnooze(reminder) },
-                    { onReschedule(reminder) }, { onDelete(reminder) }, Modifier.animateItem())
+                    { onReschedule(reminder) }, { onDelete(reminder) }, Modifier.animateItem(), { onArchive(reminder) })
             }
         }
     }

@@ -117,7 +117,7 @@ fun HomeScreen(viewModel: ReminderViewModel, onNavigateToUpcoming: () -> Unit) {
             !alertsAvailable -> "Notifications are off. Enable them to receive alerts."
             !exactAllowed -> "Alerts may be delayed. Allow precise alarm timing."
             else -> null
-        }, onNotificationSettings = { viewModel.setTab("settings") })
+        }, onNotificationSettings = { viewModel.setTab("settings") }, onArchive = viewModel::archiveReminder)
 }
 
 @Composable
@@ -128,7 +128,7 @@ fun HomeContent(
     onText: (String) -> Unit = {}, onVoice: () -> Unit = {}, onRefine: () -> Unit = {}, onAdd: () -> Unit = {},
     onSchedule: () -> Unit = {}, onEdit: (ReminderItem) -> Unit = {}, onComplete: (ReminderItem) -> Unit = {},
     onSnooze: (ReminderItem) -> Unit = {}, onReschedule: (ReminderItem) -> Unit = {}, onDelete: (ReminderItem) -> Unit = {},
-    notificationWarning: String? = null, onNotificationSettings: () -> Unit = {}
+    notificationWarning: String? = null, onNotificationSettings: () -> Unit = {}, onArchive: (ReminderItem) -> Unit = {}
 ) {
     val active = reminders.filter { !it.isCompleted && !it.isArchived }.sortedBy { it.dueDateMillis }
     val today = active.filter { ReminderTime.sameDay(it.dueDateMillis, now) }
@@ -211,7 +211,7 @@ fun HomeContent(
         if (active.isEmpty()) item { EmptyState("Room to breathe.", "Your reminders will live here.\nType one above, or use your voice.", Icons.Outlined.WbSunny) }
         else items(active.take(3), key = { it.id }) { reminder ->
             ReminderRow(reminder, timeProtocol, { onComplete(reminder) }, { onEdit(reminder) },
-                { onSnooze(reminder) }, { onReschedule(reminder) }, { onDelete(reminder) }, Modifier.animateItem())
+                { onSnooze(reminder) }, { onReschedule(reminder) }, { onDelete(reminder) }, Modifier.animateItem(), { onArchive(reminder) })
         }
         if (active.isNotEmpty()) item {
             Text("$doneToday completed today · ${today.size} still to go", color = OnSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))

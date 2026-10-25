@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.example.data.time.ReminderTime
 import java.util.Locale
 
 data class FlowMindSettings(
@@ -67,6 +66,9 @@ class ReminderRepository(
 
     suspend fun toggleCompleted(reminder: ReminderItem) =
         reminderDao.changeCompletion(reminder.id, reminder.isCompleted, System.currentTimeMillis())
+
+    suspend fun archiveReminder(reminder: ReminderItem) = reminderDao.setArchived(reminder.id, true, System.currentTimeMillis())
+    suspend fun restoreArchivedReminder(reminder: ReminderItem) = reminderDao.setArchived(reminder.id, false, System.currentTimeMillis())
 
     suspend fun snoozeReminder(reminder: ReminderItem, additionalMillis: Long) =
         reminderDao.snoozeActiveReminder(reminder.id, reminder.dueDateMillis, additionalMillis, System.currentTimeMillis())

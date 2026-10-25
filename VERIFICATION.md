@@ -4,7 +4,7 @@ Local APK compilation was stopped at the user's request. No subsequent Gradle ta
 
 ## Source checks
 
-- Passed: Kotlin grammar parsing across 35 source/test files and XML parsing across 10 files.
+- Passed: Kotlin grammar parsing across 42 source/test files and XML parsing across 12 files.
 - Passed: project import/reference checks and `git diff --check`.
 - These are source checks, not evidence of a successful Android build or working device microphone.
 
@@ -17,6 +17,10 @@ The existing signing setup is retained; the cloud environment must provide its e
 - `ReminderTimeTest`: timestamp filtering, date boundaries, weekday recurrence, snooze durations, 24-hour formatting, and parser regressions.
 - `ReminderBehaviorTest`: transactional completion without duplicate repeats, persisted schedule edits, provider credential migration/isolation, cancelling disabled alerts, and export data/escaping.
 - `FlowMindUiTest`: screen captures, navigation selection, draft validation, and 320 dp layout with enlarged text. Screenshots go to `app/build/outputs/flowmind-review/`.
+- `NotificationTimingTest`: lead-time scheduling, a bounded 24-hour catch-up window, and preserving the full snooze interval.
+- `NotificationDeliveryTest`: actual receiver-handler/Room/AlarmManager/NotificationManager paths, blocked permission/channel reporting, duplicate suppression, stale/deleted reminders, snooze reconstruction, completion/edit races, recovery, and exact-alarm fallback.
+
+There are 49 test cases in the checkout. They are prepared for cloud execution and have not been executed locally.
 
 To generate screenshot artifacts, run the unit-test task with `-Proborazzi.test.record=true` in the cloud environment.
 
@@ -35,3 +39,17 @@ Tests are prepared and have **not** been run locally. Inspect the cloud screensh
 9. Check all screens with the keyboard open, system gesture navigation, 320 dp width, and larger text. Confirm the final item can scroll above the dock.
 
 No live provider call, physical speech recognition, notification delivery, native screenshot, or motion result has been verified in this checkout.
+
+## Notification audit and repair
+
+The audit found missing contextual notification permission requests, detached reboot recovery, snooze lead-time loss after restart, and silent posting/scheduling failures. These paths were repaired before pushing:
+
+- Creating a reminder requests Android 13+ notification permission once. Today shows permission/channel/master-switch/precise-timing status, with a route to settings.
+- Recovery holds `goAsync()` until the Room query and rescheduling complete, with `finish()` in `finally`. Recovery runs after reboot, app update, clock/time-zone changes, and exact-alarm access being granted. This follows Android's [receiver lifetime](https://developer.android.com/reference/android/content/BroadcastReceiver#goAsync()) and [alarm recovery guidance](https://developer.android.com/develop/background-work/services/alarms).
+- Alarms carry the expected due timestamp. Stale pending alarms/actions are rejected, and deleted records are never reconstructed from old intent text.
+- Persistent delivery markers prevent repeat notifications for the same due timestamp. Blocked/failed posts remain eligible for recovery. Missed reminders are retried within 24 hours; older overdue items stay in the schedule without a notification avalanche.
+- Snooze timing is persisted separately from global lead time. App and shade actions use the selected interval from now. Transactions prevent an old snooze or edit from undoing a completed reminder.
+- Scheduling reports exact, approximate, disabled, expired, already-delivered, or failed outcomes. Test notifications check runtime access, app/channel blocks, and posting results. A successful post is not a delivery measurement on the phone.
+- The new monochrome status icon is separate from the launcher artwork. Normal reminders retain standard notification semantics and respect sound, quiet-hours, and banner preferences.
+
+The newer GitHub commit's dot/colon time parsing, archive/restore, swipe, and haptic behavior were integrated into the rebuilt screens. The existing Room schema, signing setup, and data remain intact.

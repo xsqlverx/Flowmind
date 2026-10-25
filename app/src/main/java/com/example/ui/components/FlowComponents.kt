@@ -131,9 +131,16 @@ fun ProgressRing(progress: Float, label: String, modifier: Modifier = Modifier) 
 
 @Composable
 fun ReminderRow(reminder: ReminderItem, timeProtocol: String = "12h", onComplete: () -> Unit, onEdit: () -> Unit,
-    onSnooze: () -> Unit = {}, onReschedule: () -> Unit = {}, onDelete: () -> Unit = {}, modifier: Modifier = Modifier) {
+    onSnooze: () -> Unit = {}, onReschedule: () -> Unit = {}, onDelete: () -> Unit = {}, modifier: Modifier = Modifier,
+    onArchive: (() -> Unit)? = null) {
     var menu by remember { mutableStateOf(false) }
-    Row(modifier.fillMaxWidth().animateContentSize().clip(RoundedCornerShape(22.dp))
+    SwipeToDismissReminderBox(modifier = modifier, onDelete = onDelete,
+        onStartToEnd = if (reminder.isArchived) onComplete else onArchive,
+        startToEndLabel = if (reminder.isArchived) "Restore" else "Archive",
+        startToEndIcon = if (reminder.isArchived) Icons.Outlined.Restore else Icons.Outlined.Archive,
+        startToEndContainerColor = SurfaceContainerHigh, startToEndContentColor = OnSurface,
+        endToStartContainerColor = ErrorContainer, endToStartContentColor = Error) {
+    Row(Modifier.fillMaxWidth().animateContentSize().clip(RoundedCornerShape(22.dp)).background(Surface)
         .clickable(onClick = onEdit).padding(vertical = 14.dp), verticalAlignment = Alignment.Top) {
         IconButton(onComplete, modifier = Modifier.size(48.dp).testTag("complete_${reminder.id}")) {
             Icon(if (reminder.isCompleted) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
@@ -156,6 +163,7 @@ fun ReminderRow(reminder: ReminderItem, timeProtocol: String = "12h", onComplete
             }
             DropdownMenu(menu, { menu = false }) {
                 DropdownMenuItem({ Text("Edit reminder") }, { menu = false; onEdit() }, leadingIcon = { Icon(Icons.Outlined.Edit, null) })
+                if (!reminder.isArchived && onArchive != null) DropdownMenuItem({ Text("Archive") }, { menu = false; onArchive() }, leadingIcon = { Icon(Icons.Outlined.Archive, null) })
                 if (!reminder.isCompleted) {
                     DropdownMenuItem({ Text("Snooze") }, { menu = false; onSnooze() }, leadingIcon = { Icon(Icons.Outlined.Snooze, null) })
                     DropdownMenuItem({ Text("Move to tomorrow") }, { menu = false; onReschedule() }, leadingIcon = { Icon(Icons.Outlined.Event, null) })
@@ -163,5 +171,6 @@ fun ReminderRow(reminder: ReminderItem, timeProtocol: String = "12h", onComplete
                 DropdownMenuItem({ Text("Delete", color = Error) }, { menu = false; onDelete() }, leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = Error) })
             }
         }
+    }
     }
 }
