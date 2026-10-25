@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /** Also provides a deterministic still mode for screenshot and accessibility checks. */
@@ -29,6 +30,14 @@ fun rememberMotionEnabled(): Boolean {
 
 @Composable
 fun rememberAppResumed(): Boolean {
-    val state by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
-    return state.isAtLeast(Lifecycle.State.RESUMED)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var resumed by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, _ ->
+            resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    return resumed
 }

@@ -119,10 +119,12 @@ class FeedbackUiTest {
         compose.waitForIdle()
         phase(FeedbackPhase.MESSAGE)
         compose.runOnIdle { owner.registry.currentState = Lifecycle.State.STARTED }
+        compose.mainClock.advanceTimeBy(50)
         compose.onNodeWithTag("app_feedback").assertDoesNotExist()
         compose.mainClock.advanceTimeBy(60_000)
         compose.runOnIdle { assertEquals(id, queue.current.value!!.id) }
         compose.runOnIdle { owner.registry.currentState = Lifecycle.State.RESUMED }
+        compose.mainClock.advanceTimeBy(50)
         phase(FeedbackPhase.MESSAGE)
         compose.mainClock.advanceTimeBy(3_000)
         compose.runOnIdle { assertNull(queue.current.value) }
